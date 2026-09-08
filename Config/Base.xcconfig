@@ -1,0 +1,13 @@
+// Base build configuration for the Aurelia app target.
+//
+// Secrets.xcconfig is git-ignored and optional. Copy Secrets.xcconfig.example
+// to Secrets.xcconfig and fill it in to enable USDA food-name search; the
+// `#include?` form means the build still succeeds when the file is absent.
+//
+// With no proxy URL set, the app degrades gracefully: manual foods, cached
+// foods, and Open Food Facts barcode lookup all keep working offline of it.
+
+NUTRITION_PROXY_URL =
+SUPABASE_ANON_KEY =
+
+#include? "Secrets.xcconfig"
