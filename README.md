@@ -8,16 +8,15 @@ and sage interface is designed as a calm daily command center — not a gamified
 
 | Layer | State | Verified how |
 |---|---|---|
-| `WellnessCore` business logic | Working | `swift test` — 10/10 pass |
+| `WellnessCore` business logic, unit handling, export format | Working | `swift test` — 28/28 pass |
 | SwiftUI app sources | Parse clean, Swift 5 mode | `swiftc -parse` on every file |
 | Xcode project, scheme, asset catalog | Present and internally consistent | reference-integrity check |
-| Full type check against the iOS SDK | **Not yet done** | needs a Mac |
-| Running on a simulator or device | **Not yet done** | needs a Mac |
+| Simulator build | Succeeded once (before the audit rewrite) | Xcode 26 on a Mac |
+| Audit rewrite type-checked on the iOS SDK | **Not yet** | next ⌘R on the Mac |
 
-The original MVP commit was written without ever being compiled and contained 18 syntax and type errors.
-Those are fixed. What has **not** happened is a real build: type checking against the actual iOS SDK, and a
-launch on hardware. Expect to work through some residual diagnostics the first time you press ⌘R, and treat
-the feature list below as "implemented in source", not "exercised on a phone".
+The app has been through a full-screen audit (see [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for the register).
+The audit rewrote most of the view layer; it parses cleanly but the next ⌘R is its first real type check.
+Expect a round of diagnostics, as with every change so far.
 
 ## What is implemented
 
@@ -28,12 +27,17 @@ the feature list below as "implemented in source", not "exercised on a phone".
   session copies, editable sets, extra sets/exercises, cardio details, and completion history.
 - Meal-grouped food history, cached recent/frequent foods, gram-based macro math, manual foods, USDA proxy
   search, Open Food Facts barcode lookup, and camera scanner.
-- Historical calendar/day editing, manual weight and seven-day trend chart, private three-angle photos,
-  arbitrary two-date comparison, HealthKit service, and notification service.
-- A separate portfolio toggle with seeded history. **MVP limitation:** demo records are tagged by their
-  predictable fixtures rather than stored in a second SwiftData file; do not use Reset Demo Data after
-  intentionally creating personal records with demo-like values. A separate persistent container is the
-  first recommended hardening task.
+- Historical calendar/day editing, manual weight and 90-day trend chart with goal line, private
+  three-angle photos with thumbnails, and two-date comparison.
+- **Apple Health sync**: steps, active and resting energy, and average heart rate are imported for the
+  last 14 days on launch, on return to the foreground, and on demand. Weights logged in the app are written
+  to Health; weights recorded elsewhere (a scale) are imported for days with no manual entry.
+- Full unit awareness: every field and display follows the profile's imperial/metric choice.
+- **Demo mode** runs against a separate in-memory store with a generated five-week history. Your own
+  records are never modified by it. Settings can also scan for — and remove — fixtures that an earlier
+  build's demo mode wrote into the real database.
+- Versioned SwiftData schema with a migration plan, a store that never self-deletes on failure, and a
+  JSON export of every record from Settings.
 
 ## Requirements
 
@@ -59,8 +63,11 @@ the feature list below as "implemented in source", not "exercised on a phone".
    developer certificate.
 8. HealthKit: Aurelia Settings → **Connect / refresh Apple Health**, accept the categories, return to Today.
    Health data stays on the device. A simulator will not reproduce Apple Watch workout history reliably.
-9. Demo Mode: Settings → **Demo Mode**. Disable it to return to personal presentation. Use
-   **Reset Demo Data** only for portfolio fixtures.
+9. Demo mode: Settings → **Portfolio → Demo mode**. It switches the whole app to a throwaway store;
+   turning it off returns to your data untouched. **Regenerate demo data** rebuilds the sample history.
+10. If you turned on demo mode in a build before September 2026, run Settings → **Your data →
+    Check for old demo data** once. It finds the fixtures that build wrote into your real records and
+    removes them on confirmation.
 
 ### Free Apple ID caveats
 
@@ -107,8 +114,8 @@ Health information and photos never enter nutrition requests. Workouts, manual/c
 supplements, weight, calendar, and photos remain useful offline. New USDA searches and uncached barcodes
 need connectivity.
 
-Deleting the app deletes its local database and private photos. This MVP does not offer backup/sync; export
-and encrypted device backup are recommended post-MVP work.
+Deleting the app deletes its local database and private photos. There is no cloud sync. Use Settings →
+**Export all data (JSON)** for a backup you control, and an encrypted iPhone backup for the photos.
 
 ## Tests
 
@@ -119,7 +126,8 @@ swift test
 ```
 
 Covers conversions, goals, no-eat-back behavior, food-by-weight macro math, completion scoring, template
-history snapshots, meal totals, trends, overrides, mocks, and isolation semantics.
+history snapshots, meal totals, trends, overrides, mocks, unit-aware display, meal inference, the JSON
+export format, and the legacy demo-fixture matching.
 
 On macOS, the app/unit build:
 
@@ -130,16 +138,9 @@ xcodebuild -project Aurelia.xcodeproj -scheme Aurelia -sdk iphonesimulator \
 
 The `Aurelia` scheme is shared and committed, so this works without opening Xcode first.
 
-## Known limitations / recommended next work
+## Known limitations / next work
 
-1. Get a real build on a Mac and resolve any remaining SDK-level type errors.
-2. Move demo fixtures into a physically separate SwiftData container and add a data-source router.
-3. Add background HealthKit observer queries and robust workout de-duplication; the service currently
-   implements authorization and daily normalized activity reads, with user-initiated refresh.
-4. Add a saved-meal composer UI (the persistent model and total calculation are present) and
-   authenticated/rate-limited nutrition requests.
-5. Add licensed exercise demonstration media, photo export/deletion controls, and VoiceOver UI tests.
-6. Add richer notification preference editors and conditional protein scheduling via a background refresh
-   strategy permitted by iOS.
-7. Reconsider `SWIFT_VERSION`. The project targets Swift 5 language mode; moving to Swift 6 will surface
-   strict-concurrency diagnostics across the SwiftUI, SwiftData, and HealthKit layers.
+See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) — it lists what the audit fixed, what is deliberately deferred,
+and why. The short version of what is still missing: a dark-mode palette, an accessibility pass, Apple
+Watch workout import, background Health delivery, restore-from-export, saved meals, and the Swift 6
+migration.
