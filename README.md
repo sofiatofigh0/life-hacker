@@ -51,9 +51,13 @@ Expect a round of diagnostics, as with every change so far.
 ## Getting it onto your iPhone
 
 1. `open Aurelia.xcodeproj`
-2. Select the blue **Aurelia** project → the **Aurelia** app target → **Signing & Capabilities**.
-3. Choose your Apple Development **Team**.
-4. Change `com.example.Aurelia` to a unique bundle identifier such as `com.yourname.Aurelia`.
+2. Copy `Config/Secrets.xcconfig.example` to `Config/Secrets.xcconfig` and set `DEVELOPMENT_TEAM` (your
+   10-character Team ID from Xcode → Settings → Accounts) and a unique `PRODUCT_BUNDLE_IDENTIFIER` such as
+   `com.yourname.Aurelia`. The file is git-ignored, so `git pull` never conflicts with your signing.
+3. Select the blue **Aurelia** project → the **Aurelia** app target → **Signing & Capabilities** and confirm
+   the Team shows as selected. (If you set it in the UI instead, Xcode writes it into `project.pbxproj` and
+   the next pull will complain — see step 2.)
+4. Apple rejects `com.example.*`, so step 2's bundle identifier is required for a device build.
 5. Confirm **HealthKit** appears under Signing & Capabilities. If Xcode shows it in red, remove it and
    re-add via **+ Capability → HealthKit**; `Aurelia/Aurelia.entitlements` already declares it.
 6. Pick an iPhone 15/16 simulator and press **⌘R** for a first smoke test. The camera and HealthKit are

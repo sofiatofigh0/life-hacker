@@ -1,12 +1,16 @@
-// Base build configuration for the Aurelia app target.
+// Base build configuration, attached to every target and configuration.
 //
-// Secrets.xcconfig is git-ignored and optional. Copy Secrets.xcconfig.example
-// to Secrets.xcconfig and fill it in to enable USDA food-name search; the
-// `#include?` form means the build still succeeds when the file is absent.
-//
-// With no proxy URL set, the app degrades gracefully: manual foods, cached
-// foods, and Open Food Facts barcode lookup all keep working offline of it.
+// Personal signing values live in Secrets.xcconfig, which is git-ignored and
+// pulled in by the `#include?` at the bottom — so `git pull` never conflicts
+// with the Team and bundle identifier Xcode would otherwise write into
+// project.pbxproj. Copy Secrets.xcconfig.example to Secrets.xcconfig once.
 
+// Defaults. Override in Secrets.xcconfig.
+PRODUCT_BUNDLE_IDENTIFIER = com.example.Aurelia
+DEVELOPMENT_TEAM =
+
+// Optional nutrition proxy. With no URL, online food search reports itself
+// unavailable while manual foods, saved foods, and barcode lookup keep working.
 NUTRITION_PROXY_URL =
 SUPABASE_ANON_KEY =
 
