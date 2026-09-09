@@ -2,22 +2,30 @@ import SwiftUI
 import SwiftData
 
 @main struct AureliaApp: App {
-    private let container: ModelContainer = {
-        let schema = Schema([AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
-            SessionExerciseEntity.self, SetEntity.self, FoodEntity.self, FoodLogEntity.self, SavedMealEntity.self,
-            WaterEntity.self, SupplementEntity.self, SupplementCheckEntity.self, WeightEntity.self,
-            ActivityEntity.self, PhotoSetEntity.self])
-        return try! ModelContainer(for: schema)
-    }()
-    var body: some Scene { WindowGroup { RootView() }.modelContainer(container) }
+    private let container: ModelContainer
+    private let storeFailure: String?
+
+    init() {
+        let result = Persistence.makeContainer()
+        container = result.container
+        storeFailure = result.failure
+    }
+
+    var body: some Scene { WindowGroup { RootView(storeFailure: storeFailure) }.modelContainer(container) }
 }
 
 struct RootView: View {
     @Environment(\.modelContext) private var context
     @Query private var profiles: [AppProfile]
+    /// Non-nil when the on-disk store could not be opened and the app is running
+    /// against a temporary in-memory database instead.
+    var storeFailure: String? = nil
     var body: some View {
-        Group { if let profile = profiles.first, profile.onboarded { MainTabs(profile: profile) } else { OnboardingView() } }
-            .task { seedLibrary() }.tint(.sage)
+        VStack(spacing: 0) {
+            if let storeFailure { StoreFailureBanner(message: storeFailure) }
+            Group { if let profile = profiles.first, profile.onboarded { MainTabs(profile: profile) } else { OnboardingView() } }
+        }
+        .task { seedLibrary() }.tint(.sage)
     }
     private func seedLibrary() {
         let count = (try? context.fetchCount(FetchDescriptor<ExerciseEntity>())) ?? 0
@@ -57,6 +65,30 @@ extension ShapeStyle where Self == Color {
     static var sage: Color { Palette.sage }
     static var cream: Color { Palette.cream }
 }
+/// Shown when the store could not be opened. The app is usable but nothing will
+/// persist, so the message has to be unmissable — and it must not suggest
+/// deleting the app, which is what would actually destroy the existing data.
+struct StoreFailureBanner: View {
+    let message: String
+    @State private var showDetail = false
+    var body: some View {
+        Button { showDetail.toggle() } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Saved data could not be opened", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline.weight(.semibold))
+                Text("Anything you log now will be lost when you quit. Your existing data is still on the device — do not delete the app.")
+                    .font(.caption)
+                if showDetail { Text(message).font(.caption2.monospaced()).padding(.top, 2) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color.orange.opacity(0.18))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+    }
+}
+
 struct EditorialTitle: View { let eyebrow: String; let title: String; var body: some View { VStack(alignment: .leading, spacing: 5) { Text(eyebrow.uppercased()).font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary); Text(title).font(.system(.largeTitle, design: .serif, weight: .medium)) }.frame(maxWidth: .infinity, alignment: .leading) } }
 struct WellnessCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { content.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.background).clipShape(RoundedRectangle(cornerRadius: 20)).shadow(color: .black.opacity(0.05), radius: 14, y: 5) } }
 
