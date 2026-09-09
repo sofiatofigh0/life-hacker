@@ -38,9 +38,24 @@ struct MainTabs: View {
     }
 }
 
-extension Color {
+/// The single source of truth for the palette. Kept separate from the two
+/// extensions below so neither can resolve `Color.sage` back to itself.
+enum Palette {
     static let sage = Color(red: 0.38, green: 0.49, blue: 0.42)
     static let cream = Color(red: 0.97, green: 0.95, blue: 0.91)
+}
+
+extension Color {
+    static let sage = Palette.sage
+    static let cream = Palette.cream
+}
+
+/// Leading-dot syntax in a `ShapeStyle` position — `.foregroundStyle(.sage)`,
+/// `.stroke(.sage)`, `.fill(.sage)` — only finds members declared on
+/// `ShapeStyle`, not on `Color`. This is how SwiftUI itself exposes `.red`.
+extension ShapeStyle where Self == Color {
+    static var sage: Color { Palette.sage }
+    static var cream: Color { Palette.cream }
 }
 struct EditorialTitle: View { let eyebrow: String; let title: String; var body: some View { VStack(alignment: .leading, spacing: 5) { Text(eyebrow.uppercased()).font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary); Text(title).font(.system(.largeTitle, design: .serif, weight: .medium)) }.frame(maxWidth: .infinity, alignment: .leading) } }
 struct WellnessCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { content.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.background).clipShape(RoundedRectangle(cornerRadius: 20)).shadow(color: .black.opacity(0.05), radius: 14, y: 5) } }
