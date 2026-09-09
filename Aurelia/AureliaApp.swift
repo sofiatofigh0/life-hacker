@@ -33,7 +33,7 @@ struct MainTabs: View {
             NavigationStack { WorkoutHome() }.tabItem { Label("Workout", systemImage: "dumbbell") }
             NavigationStack { FoodView(profile: profile) }.tabItem { Label("Food", systemImage: "leaf") }
             NavigationStack { CalendarHistoryView(profile: profile) }.tabItem { Label("Calendar", systemImage: "calendar") }
-            NavigationStack { ProgressView(profile: profile) }.tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
+            NavigationStack { ProgressTabView(profile: profile) }.tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
         }
     }
 }
