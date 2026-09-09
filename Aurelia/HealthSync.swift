@@ -32,8 +32,9 @@ final class HealthSync {
 
     func requestAccessAndSync(context: ModelContext) async {
         do { try await service.authorize() }
-        catch { lastError = error.localizedDescription; return }
+        catch { lastError = error.localizedDescription; Haptics.warning(); return }
         await sync(context: context)
+        if lastError == nil { Haptics.success() } else { Haptics.warning() }
     }
 
     /// Imports the last `days` days (today inclusive).

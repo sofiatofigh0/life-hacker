@@ -172,6 +172,7 @@ struct WeightEntryView: View {
         // The profile's current weight drives the goal card; keep it at the latest entry.
         if weights.first.map({ stamp >= $0.date }) ?? true { profile.currentKG = kg }
         try? context.save()
+        Haptics.success()
         // Best-effort write to Apple Health; never blocks the log.
         Task { try? await HealthKitService.shared.saveBodyMass(kilograms: kg, date: stamp) }
         dismiss()

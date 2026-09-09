@@ -17,32 +17,82 @@ struct RemoteNutritionService: NutritionProvider {
         return try JSONDecoder().decode([FoodSnapshot].self, from: data)
     }
 
+    /// Looks a barcode up on Open Food Facts.
+    ///
+    /// OFF is crowdsourced and inconsistent: numeric fields arrive as numbers
+    /// *or* strings, energy is sometimes only present in kJ, and many products
+    /// have a name but no nutrition facts at all. The original decoder treated
+    /// every one of those as "0 kcal", which is what "found the name but not the
+    /// macros" was. Now: numbers and strings both decode, kJ is converted, and a
+    /// product with no nutrition data is returned with `hasNutritionData == false`
+    /// so the UI can ask for the label values instead of silently logging zeros.
     func barcode(_ code: String) async throws -> FoodSnapshot? {
+        try await barcodeLookup(code)?.snapshot
+    }
+
+    struct BarcodeResult {
+        var snapshot: FoodSnapshot
+        var hasNutritionData: Bool
+    }
+
+    func barcodeLookup(_ code: String) async throws -> BarcodeResult? {
         // Scanned codes are digits, but never interpolate untrusted input into a URL.
         var components = URLComponents(string: "https://world.openfoodfacts.org/api/v2/product/")
         components?.path += code + ".json"
-        components?.queryItems = [.init(name: "fields", value: "product_name,brands,code,serving_quantity,nutriments")]
+        components?.queryItems = [.init(name: "fields", value: "product_name,product_name_en,generic_name,brands,code,serving_quantity,nutriments")]
         guard let url = components?.url else { throw URLError(.badURL) }
-        let (data, _) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        // OFF asks clients to identify themselves and throttles anonymous traffic.
+        request.setValue("Aurelia/1.0 (personal iOS wellness tracker)", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 404 { return nil }
         let result = try JSONDecoder().decode(OFFResponse.self, from: data)
-        guard let p = result.product, let name = p.productName, !name.isEmpty else { return nil }
-        return FoodSnapshot(
-            name: name, brand: p.brands, barcode: p.code,
-            nutrientsPer100Grams: .init(calories: p.nutriments?.energyKcal100g ?? 0, protein: p.nutriments?.proteins100g ?? 0,
-                                        carbs: p.nutriments?.carbohydrates100g ?? 0, fat: p.nutriments?.fat100g ?? 0),
-            servingGrams: p.servingQuantity)
+        guard let p = result.product else { return nil }
+        let name = [p.productName, p.productNameEN, p.genericName].compactMap { $0 }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
+        guard let name else { return nil }
+
+        let n = p.nutriments
+        let kcal = n?.energyKcal100g?.value
+            ?? n?.energyKJ100g?.value.map { $0 / 4.184 }
+            ?? n?.energy100g?.value.map { $0 / 4.184 }   // `energy_100g` is kJ on OFF
+        let protein = n?.proteins100g?.value
+        let carbs = n?.carbohydrates100g?.value
+        let fat = n?.fat100g?.value
+        let hasData = [kcal, protein, carbs, fat].contains { $0 != nil }
+
+        let snapshot = FoodSnapshot(
+            name: name, brand: p.brands?.trimmingCharacters(in: .whitespaces), barcode: p.code ?? code,
+            nutrientsPer100Grams: .init(calories: kcal ?? 0, protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0),
+            servingGrams: p.servingQuantity?.value)
+        return BarcodeResult(snapshot: snapshot, hasNutritionData: hasData)
     }
 
+    /// A number that OFF may send as `12.5` or `"12.5"` (or `"12,5"`).
+    private struct FlexibleDouble: Decodable {
+        let value: Double?
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let number = try? container.decode(Double.self) { value = number }
+            else if let text = try? container.decode(String.self) {
+                value = Double(text.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces))
+            } else { value = nil }
+        }
+    }
     private struct OFFResponse: Decodable { let product: Product? }
     private struct Product: Decodable {
-        let productName: String?; let brands: String?; let code: String?; let servingQuantity: Double?; let nutriments: Nutriments?
-        enum CodingKeys: String, CodingKey { case productName = "product_name", brands, code, servingQuantity = "serving_quantity", nutriments }
+        let productName: String?; let productNameEN: String?; let genericName: String?; let brands: String?; let code: String?
+        let servingQuantity: FlexibleDouble?; let nutriments: Nutriments?
+        enum CodingKeys: String, CodingKey {
+            case productName = "product_name", productNameEN = "product_name_en", genericName = "generic_name"
+            case brands, code, servingQuantity = "serving_quantity", nutriments
+        }
     }
     private struct Nutriments: Decodable {
-        let energyKcal100g, proteins100g, carbohydrates100g, fat100g: Double?
+        let energyKcal100g, energyKJ100g, energy100g, proteins100g, carbohydrates100g, fat100g: FlexibleDouble?
         enum CodingKeys: String, CodingKey {
-            case energyKcal100g = "energy-kcal_100g", proteins100g = "proteins_100g"
-            case carbohydrates100g = "carbohydrates_100g", fat100g = "fat_100g"
+            case energyKcal100g = "energy-kcal_100g", energyKJ100g = "energy-kj_100g", energy100g = "energy_100g"
+            case proteins100g = "proteins_100g", carbohydrates100g = "carbohydrates_100g", fat100g = "fat_100g"
         }
     }
 }

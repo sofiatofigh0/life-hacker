@@ -130,6 +130,7 @@ struct AddFoodView: View {
     @State private var error: String?
     @State private var scanner = false
     @State private var manual = false
+    @State private var manualPrefill: FoodSnapshot?
     @State private var selected: FoodEntity?
 
     private let service = RemoteNutritionService(proxyURL: Self.configuredProxyURL)
@@ -189,7 +190,9 @@ struct AddFoodView: View {
         .toolbar { Button("Cancel") { dismiss() } }
         .navigationDestination(item: $selected) { food in FoodAmountView(food: food, date: date, onDone: onDone) }
         .sheet(isPresented: $scanner) { BarcodeScannerView { code in scanner = false; lookup(code) } }
-        .sheet(isPresented: $manual) { ManualFoodView { food in manual = false; selected = food } }
+        .sheet(isPresented: $manual) {
+            ManualFoodView(prefill: manualPrefill) { food in manual = false; manualPrefill = nil; selected = food }
+        }
     }
 
     private func foodRow(_ food: FoodEntity) -> some View {
@@ -245,13 +248,29 @@ struct AddFoodView: View {
     }
 
     private func lookup(_ code: String) {
-        if let match = cached.first(where: { $0.barcode == code }) { selected = match; return }
+        if let match = cached.first(where: { $0.barcode == code }) { Haptics.success(); selected = match; return }
         loading = true; error = nil
         Task {
             do {
-                if let food = try await service.barcode(code) { selected = cache(food) }
-                else { error = "Barcode \(code) not found. Create this food manually." }
+                if let result = try await service.barcodeLookup(code) {
+                    if result.hasNutritionData {
+                        Haptics.success()
+                        selected = cache(result.snapshot)
+                    } else {
+                        // The product exists but nobody has entered its label yet.
+                        Haptics.warning()
+                        error = "Found “\(result.snapshot.name)” but Open Food Facts has no nutrition facts for it. Enter them from the label."
+                        manualPrefill = result.snapshot
+                        manual = true
+                    }
+                } else {
+                    Haptics.warning()
+                    error = "Barcode \(code) isn't in Open Food Facts. Create the food manually."
+                    manualPrefill = FoodSnapshot(name: "", barcode: code, nutrientsPer100Grams: Macro())
+                    manual = true
+                }
             } catch {
+                Haptics.warning()
                 self.error = "Could not look up that barcode. Check your connection."
             }
             loading = false
@@ -297,6 +316,7 @@ struct FoodAmountView: View {
                 food.useCount += 1
                 food.lastUsed = .now
                 try? context.save()
+                Haptics.success()
                 onDone()
             }
             .buttonStyle(.borderedProminent)
@@ -310,17 +330,34 @@ struct ManualFoodView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     var onSaved: (FoodEntity) -> Void
-    @State private var name = ""
-    @State private var brand = ""
-    @State private var serving: Double? = 100
+    private let barcode: String?
+    @State private var name: String
+    @State private var brand: String
+    @State private var serving: Double?
     @State private var calories: Double?
     @State private var protein: Double?
     @State private var carbs: Double?
     @State private var fat: Double?
 
+    /// `prefill` carries what a barcode lookup did find (name, brand, code,
+    /// serving) when it found no nutrition facts, so the user only types the label.
+    init(prefill: FoodSnapshot? = nil, onSaved: @escaping (FoodEntity) -> Void) {
+        self.onSaved = onSaved
+        barcode = prefill?.barcode
+        _name = State(initialValue: prefill?.name ?? "")
+        _brand = State(initialValue: prefill?.brand ?? "")
+        _serving = State(initialValue: prefill?.servingGrams ?? 100)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                if barcode != nil {
+                    Section {
+                        Label("Scanned product without nutrition facts on file. Enter the values from the label, per 100 g.", systemImage: "barcode")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
                 Section {
                     TextField("Name", text: $name)
                     TextField("Brand (optional)", text: $brand)
@@ -339,10 +376,11 @@ struct ManualFoodView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         let entity = FoodEntity(name: name.trimmingCharacters(in: .whitespaces), brand: brand.trimmingCharacters(in: .whitespaces),
-                                                calories100: calories ?? 0, protein100: protein ?? 0, carbs100: carbs ?? 0, fat100: fat ?? 0,
-                                                servingGrams: serving ?? 100)
+                                                barcode: barcode, calories100: calories ?? 0, protein100: protein ?? 0,
+                                                carbs100: carbs ?? 0, fat100: fat ?? 0, servingGrams: serving ?? 100)
                         context.insert(entity)
                         try? context.save()
+                        Haptics.success()
                         onSaved(entity)
                     }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)

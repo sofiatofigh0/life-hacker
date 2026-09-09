@@ -215,7 +215,7 @@ struct StrengthSessionView: View {
                 if workout.completed {
                     Button("Reopen workout") { workout.completed = false; try? context.save() }
                 } else {
-                    Button("Finish workout") { workout.completed = true; try? context.save() }
+                    Button("Finish workout") { workout.completed = true; try? context.save(); Haptics.success() }
                         .buttonStyle(.borderedProminent)
                         .disabled(workout.exercises.isEmpty)
                 }
@@ -351,7 +351,7 @@ struct CardioEditor: View {
                 if workout.completed {
                     Button("Reopen") { workout.completed = false; try? context.save() }
                 } else {
-                    Button("Save & complete") { workout.completed = true; try? context.save() }.buttonStyle(.borderedProminent)
+                    Button("Save & complete") { workout.completed = true; try? context.save(); Haptics.success() }.buttonStyle(.borderedProminent)
                 }
             }
             Section {

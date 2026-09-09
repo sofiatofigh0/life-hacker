@@ -152,6 +152,7 @@ struct TodayView: View {
                         Button(profile.units.waterQuickAddLabel(liters: amount)) {
                             context.insert(WaterEntity(liters: amount))
                             try? context.save()
+                            Haptics.tap()
                         }
                         .buttonStyle(.bordered)
                     }
@@ -194,6 +195,7 @@ struct TodayView: View {
             context.insert(SupplementCheckEntity(name: name))
         }
         try? context.save()
+        Haptics.tap()
     }
 
     private func undoLastWater() {
@@ -206,6 +208,7 @@ struct TodayView: View {
         let workout = WorkoutEntity.make(from: template, date: .now)
         context.insert(workout)
         try? context.save()
+        Haptics.success()
         startedWorkout = workout
     }
 }

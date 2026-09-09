@@ -218,6 +218,7 @@ struct SettingsView: View {
             try context.save()
             let result = try ExportService.writeFile(context: context)
             exportFile = ExportFile(url: result.url, records: result.records)
+            Haptics.success()
         } catch {
             exportError = "Export failed: \(error.localizedDescription)"
         }
@@ -226,7 +227,8 @@ struct SettingsView: View {
     private func removeLegacyDemo() {
         do {
             let report = try DemoCleanup.remove(context: context)
-            cleanupResult = "Removed \(report.summary)."
+            cleanupResult = report.total == 0 ? "Nothing to remove." : "Removed \(report.summary)."
+            Haptics.success()
         } catch {
             cleanupResult = "Could not remove demo data: \(error.localizedDescription)"
         }

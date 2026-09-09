@@ -1,6 +1,15 @@
 import SwiftUI
 import SwiftData
 import Observation
+import UIKit
+
+/// Tactile confirmation for actions whose result is otherwise easy to miss.
+/// "Pressing something doesn't indicate if it worked" was a direct report.
+enum Haptics {
+    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+    static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+    static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+}
 
 @main struct AureliaApp: App {
     private let container: ModelContainer
