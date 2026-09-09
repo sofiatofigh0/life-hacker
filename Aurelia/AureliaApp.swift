@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Observation
 
 @main struct AureliaApp: App {
     private let container: ModelContainer
@@ -11,25 +12,102 @@ import SwiftData
         storeFailure = result.failure
     }
 
-    var body: some Scene { WindowGroup { RootView(storeFailure: storeFailure) }.modelContainer(container) }
+    var body: some Scene {
+        WindowGroup {
+            ContainerSwitcher(real: container, storeFailure: storeFailure)
+        }
+    }
 }
+
+// MARK: - Demo mode
+
+/// Demo mode is a presentation setting, not user data, so it lives in
+/// UserDefaults rather than on the profile. That also lets it decide which
+/// *container* the app runs against — the whole point of the redesign.
+@MainActor @Observable
+final class DemoModeController {
+    static let shared = DemoModeController()
+    private static let key = "aurelia.demoMode"
+
+    private(set) var isEnabled: Bool
+    /// Bumped to rebuild the demo container from scratch.
+    private(set) var generation = 0
+
+    private init() { isEnabled = UserDefaults.standard.bool(forKey: Self.key) }
+
+    func setEnabled(_ enabled: Bool) {
+        guard enabled != isEnabled else { return }
+        isEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.key)
+    }
+
+    /// A binding for a Toggle.
+    var enabledBinding: Binding<Bool> {
+        Binding(get: { self.isEnabled }, set: { self.setEnabled($0) })
+    }
+
+    func reset() { generation += 1 }
+}
+
+/// Chooses between the real store and a throwaway demo store, and rebuilds the
+/// view tree when that choice changes so every `@Query` re-fetches.
+struct ContainerSwitcher: View {
+    let real: ModelContainer
+    let storeFailure: String?
+    @State private var demo = DemoModeController.shared
+    @State private var demoContainer: ModelContainer?
+
+    var body: some View {
+        let active = demo.isEnabled ? (demoContainer ?? real) : real
+        RootView(storeFailure: demo.isEnabled ? nil : storeFailure)
+            .modelContainer(active)
+            .id("\(demo.isEnabled)-\(demo.generation)-\(demoContainer == nil)")
+            // A cream and sage palette is designed for light appearance; the
+            // cards use `.background`, which went black in dark mode.
+            .preferredColorScheme(.light)
+            .onChange(of: demo.isEnabled, initial: true) { _, enabled in
+                if enabled && demoContainer == nil { demoContainer = Persistence.makeDemoContainer() }
+            }
+            .onChange(of: demo.generation) { _, _ in
+                demoContainer = Persistence.makeDemoContainer()
+            }
+    }
+}
+
+// MARK: - Root
 
 struct RootView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var profiles: [AppProfile]
     /// Non-nil when the on-disk store could not be opened and the app is running
     /// against a temporary in-memory database instead.
     var storeFailure: String? = nil
+    @State private var sync = HealthSync.shared
+    @State private var demo = DemoModeController.shared
+
     var body: some View {
         VStack(spacing: 0) {
             if let storeFailure { StoreFailureBanner(message: storeFailure) }
-            Group { if let profile = profiles.first, profile.onboarded { MainTabs(profile: profile) } else { OnboardingView() } }
+            if demo.isEnabled { DemoBanner() }
+            Group {
+                if let profile = profiles.first, profile.onboarded { MainTabs(profile: profile) }
+                else { OnboardingView() }
+            }
         }
-        .task { seedLibrary() }.tint(.sage)
+        .tint(.sage)
+        .task { await syncHealthIfAppropriate() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await syncHealthIfAppropriate() } }
+        }
     }
-    private func seedLibrary() {
-        let count = (try? context.fetchCount(FetchDescriptor<ExerciseEntity>())) ?? 0
-        guard count == 0 else { return }; SeedData.exercises.forEach { context.insert(ExerciseEntity($0.0, summary: $0.1, tips: $0.2)) }; try? context.save()
+
+    /// Health data belongs to the real store only, and only once there is a
+    /// profile to attach it to.
+    private func syncHealthIfAppropriate() async {
+        guard !demo.isEnabled, profiles.first?.onboarded == true else { return }
+        if let last = sync.lastSynced, Date.now.timeIntervalSince(last) < 60 { return }
+        await sync.sync(context: context)
     }
 }
 
@@ -38,7 +116,7 @@ struct MainTabs: View {
     var body: some View {
         TabView {
             NavigationStack { TodayView(profile: profile) }.tabItem { Label("Today", systemImage: "sun.max") }
-            NavigationStack { WorkoutHome() }.tabItem { Label("Workout", systemImage: "dumbbell") }
+            NavigationStack { WorkoutHome(profile: profile) }.tabItem { Label("Workout", systemImage: "dumbbell") }
             NavigationStack { FoodView(profile: profile) }.tabItem { Label("Food", systemImage: "leaf") }
             NavigationStack { CalendarHistoryView(profile: profile) }.tabItem { Label("Calendar", systemImage: "calendar") }
             NavigationStack { ProgressTabView(profile: profile) }.tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
@@ -46,16 +124,20 @@ struct MainTabs: View {
     }
 }
 
+// MARK: - Palette
+
 /// The single source of truth for the palette. Kept separate from the two
 /// extensions below so neither can resolve `Color.sage` back to itself.
 enum Palette {
     static let sage = Color(red: 0.38, green: 0.49, blue: 0.42)
     static let cream = Color(red: 0.97, green: 0.95, blue: 0.91)
+    static let charcoal = Color(red: 0.18, green: 0.18, blue: 0.17)
 }
 
 extension Color {
     static let sage = Palette.sage
     static let cream = Palette.cream
+    static let charcoal = Palette.charcoal
 }
 
 /// Leading-dot syntax in a `ShapeStyle` position — `.foregroundStyle(.sage)`,
@@ -64,7 +146,11 @@ extension Color {
 extension ShapeStyle where Self == Color {
     static var sage: Color { Palette.sage }
     static var cream: Color { Palette.cream }
+    static var charcoal: Color { Palette.charcoal }
 }
+
+// MARK: - Banners
+
 /// Shown when the store could not be opened. The app is usable but nothing will
 /// persist, so the message has to be unmissable — and it must not suggest
 /// deleting the app, which is what would actually destroy the existing data.
@@ -89,26 +175,170 @@ struct StoreFailureBanner: View {
     }
 }
 
-struct EditorialTitle: View { let eyebrow: String; let title: String; var body: some View { VStack(alignment: .leading, spacing: 5) { Text(eyebrow.uppercased()).font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary); Text(title).font(.system(.largeTitle, design: .serif, weight: .medium)) }.frame(maxWidth: .infinity, alignment: .leading) } }
-struct WellnessCard<Content: View>: View { @ViewBuilder var content: Content; var body: some View { content.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(.background).clipShape(RoundedRectangle(cornerRadius: 20)).shadow(color: .black.opacity(0.05), radius: 14, y: 5) } }
-
-struct OnboardingView: View {
-    @Environment(\.modelContext) private var context
-    @State private var page = 0; @State private var age = 30; @State private var sex = Sex.female; @State private var height = 165.0
-    @State private var current = 70.0; @State private var goal = 65.0; @State private var activity = ActivityLevel.moderate
-    @State private var mode = GoalMode.cut; @State private var units = UnitSystem.imperial; @State private var calories = 1800; @State private var protein = 115
-    @State private var steps = 10_000; @State private var water = 1.9; @State private var healthMessage = "Connect when ready"
+struct DemoBanner: View {
     var body: some View {
-        NavigationStack { ZStack { Color.cream.ignoresSafeArea(); VStack(spacing: 28) {
-            EditorialTitle(eyebrow: "Aurelia", title: page == 0 ? "Wellness, considered." : page == 1 ? "Your foundations" : "A gentle direction")
-            Group {
-                if page == 0 { Text("A private, offline-first home for training, nourishment, activity, and progress.").font(.title3).foregroundStyle(.secondary); Spacer() }
-                else if page == 1 { Form { Stepper("Age: \(age)", value: $age, in: 16...100); Picker("Sex", selection: $sex) { ForEach(Sex.allCases, id: \.self) { Text($0.rawValue.capitalized) } }; LabeledContent("Height (cm)") { TextField("", value: $height, format: .number).keyboardType(.decimalPad) }; LabeledContent("Current weight (kg)") { TextField("", value: $current, format: .number).keyboardType(.decimalPad) }; LabeledContent("Goal weight (kg)") { TextField("", value: $goal, format: .number).keyboardType(.decimalPad) }; Picker("Activity", selection: $activity) { ForEach(ActivityLevel.allCases, id: \.self) { Text(String(describing: $0)) } }; Picker("Units", selection: $units) { ForEach(UnitSystem.allCases, id: \.self) { Text($0.rawValue.capitalized) } } }.scrollContentBackground(.hidden) }
-                else { Form { Picker("Goal", selection: $mode) { Text("Cut").tag(GoalMode.cut); Text("Maintain / Recomp").tag(GoalMode.maintain); Text("Bulk").tag(GoalMode.bulk) }.onChange(of: mode) { recommend() }; LabeledContent("Daily calories") { TextField("", value: $calories, format: .number).keyboardType(.numberPad) }; LabeledContent("Protein (g)") { TextField("", value: $protein, format: .number).keyboardType(.numberPad) }; LabeledContent("Steps") { TextField("", value: $steps, format: .number).keyboardType(.numberPad) }; LabeledContent("Water (L)") { TextField("", value: $water, format: .number).keyboardType(.decimalPad) }; Button("Connect Apple Health") { Task { do { try await HealthKitService().authorize(); healthMessage = "Health access requested" } catch { healthMessage = "You can connect later in Settings" } } }; Text(healthMessage).font(.footnote).foregroundStyle(.secondary) }.scrollContentBackground(.hidden) }
-            }
-            Button(page == 2 ? "Begin" : "Continue") { if page < 2 { page += 1; if page == 2 { recommend() } } else { finish() } }.buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth: .infinity)
-        }.padding(24) } }
+        Label("Demo data — your real records are untouched", systemImage: "sparkles")
+            .font(.caption.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(Color.sage.opacity(0.18))
     }
-    private func recommend() { let r = GoalCalculator.recommend(age: age, sex: sex, heightCM: height, weightKG: current, activity: activity, mode: mode); calories = r.calories; protein = r.proteinGrams }
-    private func finish() { context.insert(AppProfile(age: age, sex: sex, heightCM: height, currentKG: current, goalKG: goal, activity: activity, units: units, goal: mode, calorieTarget: calories, proteinTarget: protein, stepTarget: steps, waterTargetLiters: water, onboarded: true)); context.insert(SupplementEntity(name: "Creatine")); context.insert(SupplementEntity(name: "Multivitamin", order: 1)); try? context.save() }
+}
+
+// MARK: - Shared layout
+
+struct EditorialTitle: View {
+    let eyebrow: String
+    let title: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(eyebrow.uppercased()).font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
+            Text(title).font(.system(.largeTitle, design: .serif, weight: .medium))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct WellnessCard<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.background)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .black.opacity(0.05), radius: 14, y: 5)
+    }
+}
+
+/// The frame every tab root shares: editorial header, optional trailing
+/// control, cream ground, and — when it *is* the root — no system nav bar,
+/// so the screen has one title instead of two.
+struct TabScreen<Trailing: View, Content: View>: View {
+    let eyebrow: String
+    let title: String
+    var hidesNavigationBar = true
+    @ViewBuilder var trailing: Trailing
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                HStack(alignment: .top) { EditorialTitle(eyebrow: eyebrow, title: title); trailing }
+                content
+            }
+            .padding(18)
+        }
+        .background(Color.cream.opacity(0.45))
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(hidesNavigationBar ? .hidden : .visible, for: .navigationBar)
+    }
+}
+
+extension TabScreen where Trailing == EmptyView {
+    init(eyebrow: String, title: String, hidesNavigationBar: Bool = true, @ViewBuilder content: () -> Content) {
+        self.init(eyebrow: eyebrow, title: title, hidesNavigationBar: hidesNavigationBar, trailing: { EmptyView() }, content: content)
+    }
+}
+
+/// A round header control, e.g. the Settings gear or the Add Food plus.
+struct HeaderButton: View {
+    let systemImage: String
+    let label: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .frame(width: 44, height: 44)
+                .background(.background, in: Circle())
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+        }
+        .accessibilityLabel(label)
+    }
+}
+
+/// One row of the Today checklist.
+struct ChecklistRow: View {
+    let title: String
+    let detail: String
+    let done: Bool
+    let icon: String
+    var chevron = true
+    var body: some View {
+        HStack {
+            Image(systemName: icon).frame(width: 30).foregroundStyle(.sage)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if done { Image(systemName: "checkmark.circle.fill").foregroundStyle(.sage) }
+            else if chevron { Image(systemName: "chevron.right").foregroundStyle(.secondary) }
+        }
+    }
+}
+
+// MARK: - Numeric entry
+
+/// A text field for an optional number. Shows the placeholder when empty
+/// instead of a literal "0", accepts either decimal separator, and does not
+/// fight the user while they type ("1." stays "1.").
+struct DecimalField: View {
+    let placeholder: String
+    @Binding var value: Double?
+    var fractionDigits: Int = 1
+    var integer = false
+    @State private var text = ""
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .keyboardType(integer ? .numberPad : .decimalPad)
+            .multilineTextAlignment(.trailing)
+            .onAppear { text = format(value) }
+            .onChange(of: value) { _, new in
+                if !DecimalField.approximatelyEqual(parse(text), new) { text = format(new) }
+            }
+            .onChange(of: text) { _, new in
+                let parsed = parse(new)
+                if !DecimalField.approximatelyEqual(parsed, value) { value = parsed }
+            }
+    }
+
+    private func format(_ v: Double?) -> String {
+        guard let v else { return "" }
+        return v.formatted(.number.precision(.fractionLength(0...(integer ? 0 : fractionDigits))).grouping(.never))
+    }
+    private func parse(_ s: String) -> Double? {
+        let t = s.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespaces)
+        return t.isEmpty ? nil : Double(t)
+    }
+    static func approximatelyEqual(_ a: Double?, _ b: Double?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case let (x?, y?): return abs(x - y) < 0.000_01
+        default: return false
+        }
+    }
+}
+
+extension Binding where Value == Double {
+    /// Presents 0 as "empty" so a fresh field shows its placeholder.
+    var zeroAsNil: Binding<Double?> {
+        Binding<Double?>(get: { wrappedValue == 0 ? nil : wrappedValue }, set: { wrappedValue = $0 ?? 0 })
+    }
+}
+
+extension Binding where Value == Int {
+    var zeroAsNil: Binding<Double?> {
+        Binding<Double?>(get: { wrappedValue == 0 ? nil : Double(wrappedValue) }, set: { wrappedValue = Int(($0 ?? 0).rounded()) })
+    }
+}
+
+extension Binding where Value == Double? {
+    /// A view of a stored (metric) value in display units.
+    func converted(toDisplay out: @escaping (Double) -> Double, fromDisplay input: @escaping (Double) -> Double) -> Binding<Double?> {
+        Binding<Double?>(get: { wrappedValue.map(out) }, set: { wrappedValue = $0.map(input) })
+    }
 }

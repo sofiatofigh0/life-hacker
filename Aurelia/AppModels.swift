@@ -17,8 +17,23 @@ import SwiftData
         self.proteinTarget = proteinTarget; self.stepTarget = stepTarget; self.waterTargetLiters = waterTargetLiters
         self.onboarded = onboarded; self.demoMode = demoMode
     }
-    var units: UnitSystem { UnitSystem(rawValue: unitRaw) ?? .imperial }
-    var goal: GoalMode { GoalMode(rawValue: goalRaw) ?? .maintain }
+    var units: UnitSystem {
+        get { UnitSystem(rawValue: unitRaw) ?? .imperial }
+        set { unitRaw = newValue.rawValue }
+    }
+    var goal: GoalMode {
+        get { GoalMode(rawValue: goalRaw) ?? .maintain }
+        set { goalRaw = newValue.rawValue }
+    }
+    var sex: Sex {
+        get { Sex(rawValue: sexRaw) ?? .female }
+        set { sexRaw = newValue.rawValue }
+    }
+    /// Stored as the multiplier's string form ("1.55"); there was no way to read it back.
+    var activity: ActivityLevel {
+        get { Double(activityRaw).flatMap(ActivityLevel.init(rawValue:)) ?? .moderate }
+        set { activityRaw = String(newValue.rawValue) }
+    }
 }
 
 @Model final class ExerciseEntity {
@@ -53,7 +68,13 @@ import SwiftData
 @Model final class SupplementEntity { var name: String; var order: Int; init(name: String, order: Int = 0) { self.name = name; self.order = order } }
 @Model final class SupplementCheckEntity { var date: Date; var supplementName: String; init(date: Date = .now, name: String) { self.date = date; self.supplementName = name } }
 @Model final class WeightEntity { var date: Date; var kilograms: Double; var source: String; init(date: Date = .now, kilograms: Double, source: String = "Manual") { self.date = date; self.kilograms = kilograms; self.source = source } }
-@Model final class ActivityEntity { var date: Date; var steps: Double; var activeCalories: Double; var basalCalories: Double?; var averageHeartRate: Double?; init(date: Date, steps: Double, activeCalories: Double) { self.date = date; self.steps = steps; self.activeCalories = activeCalories } }
+@Model final class ActivityEntity {
+    var date: Date; var steps: Double; var activeCalories: Double; var basalCalories: Double?; var averageHeartRate: Double?
+    init(date: Date, steps: Double, activeCalories: Double, basalCalories: Double? = nil, averageHeartRate: Double? = nil) {
+        self.date = date; self.steps = steps; self.activeCalories = activeCalories
+        self.basalCalories = basalCalories; self.averageHeartRate = averageHeartRate
+    }
+}
 @Model final class PhotoSetEntity { var date: Date; var front: String; var side: String; var back: String; var isDemo: Bool; init(date: Date = .now, front: String, side: String, back: String, isDemo: Bool = false) { self.date = date; self.front = front; self.side = side; self.back = back; self.isDemo = isDemo } }
 
 enum SeedData {

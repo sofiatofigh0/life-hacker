@@ -9,9 +9,6 @@
 /* Begin PBXBuildFile section */
 		A1B2C3D000000000000000A0 /* AureliaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B0 /* AureliaApp.swift */; };
 		A1B2C3D000000000000000A1 /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B1 /* AppModels.swift */; };
-		A1B2C3D000000000000000A2 /* DashboardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B2 /* DashboardViews.swift */; };
-		A1B2C3D000000000000000A3 /* LoggingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B3 /* LoggingViews.swift */; };
-		A1B2C3D000000000000000A4 /* HistorySettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B4 /* HistorySettingsViews.swift */; };
 		A1B2C3D000000000000000A5 /* Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B5 /* Services.swift */; };
 		A1B2C3D000000000000000A6 /* WellnessCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B6 /* WellnessCore.swift */; };
 		A1B2C3D000000000000000A7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000B7 /* Assets.xcassets */; };
@@ -19,6 +16,16 @@
 		A1B2C3D000000000000000A9 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000BF /* Persistence.swift */; };
 		A1B2C3D000000000000000AA /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000C2 /* ExportService.swift */; };
 		A1B2C3D000000000000000AB /* DataExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D000000000000000C3 /* DataExport.swift */; };
+		A1B2C3D0000000000000A100 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B100 /* OnboardingView.swift */; };
+		A1B2C3D0000000000000A101 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B101 /* TodayView.swift */; };
+		A1B2C3D0000000000000A102 /* FoodViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B102 /* FoodViews.swift */; };
+		A1B2C3D0000000000000A103 /* WorkoutViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B103 /* WorkoutViews.swift */; };
+		A1B2C3D0000000000000A104 /* HistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B104 /* HistoryViews.swift */; };
+		A1B2C3D0000000000000A105 /* ProgressViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B105 /* ProgressViews.swift */; };
+		A1B2C3D0000000000000A106 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B106 /* SettingsView.swift */; };
+		A1B2C3D0000000000000A107 /* HealthSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B107 /* HealthSync.swift */; };
+		A1B2C3D0000000000000A108 /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B108 /* DemoData.swift */; };
+		A1B2C3D0000000000000A109 /* Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B109 /* Presentation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,9 +41,6 @@
 /* Begin PBXFileReference section */
 		A1B2C3D000000000000000B0 /* AureliaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AureliaApp.swift; sourceTree = "<group>"; };
 		A1B2C3D000000000000000B1 /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
-		A1B2C3D000000000000000B2 /* DashboardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViews.swift; sourceTree = "<group>"; };
-		A1B2C3D000000000000000B3 /* LoggingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggingViews.swift; sourceTree = "<group>"; };
-		A1B2C3D000000000000000B4 /* HistorySettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistorySettingsViews.swift; sourceTree = "<group>"; };
 		A1B2C3D000000000000000B5 /* Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services.swift; sourceTree = "<group>"; };
 		A1B2C3D000000000000000B6 /* WellnessCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WellnessCore.swift; sourceTree = "<group>"; };
 		A1B2C3D000000000000000B7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -50,6 +54,16 @@
 		A1B2C3D000000000000000BC /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 		A1B2C3D000000000000000BD /* Aurelia.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aurelia.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D000000000000000BE /* AureliaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AureliaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D0000000000000B100 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B101 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B102 /* FoodViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodViews.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B103 /* WorkoutViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViews.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B104 /* HistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViews.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B105 /* ProgressViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressViews.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B106 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B107 /* HealthSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSync.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B108 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B109 /* Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -86,12 +100,18 @@
 			children = (
 				A1B2C3D000000000000000B0 /* AureliaApp.swift */,
 				A1B2C3D000000000000000B1 /* AppModels.swift */,
-				A1B2C3D000000000000000B2 /* DashboardViews.swift */,
-				A1B2C3D000000000000000B3 /* LoggingViews.swift */,
-				A1B2C3D000000000000000B4 /* HistorySettingsViews.swift */,
 				A1B2C3D000000000000000B5 /* Services.swift */,
 				A1B2C3D000000000000000BF /* Persistence.swift */,
 				A1B2C3D000000000000000C2 /* ExportService.swift */,
+				A1B2C3D0000000000000B100 /* OnboardingView.swift */,
+				A1B2C3D0000000000000B101 /* TodayView.swift */,
+				A1B2C3D0000000000000B102 /* FoodViews.swift */,
+				A1B2C3D0000000000000B103 /* WorkoutViews.swift */,
+				A1B2C3D0000000000000B104 /* HistoryViews.swift */,
+				A1B2C3D0000000000000B105 /* ProgressViews.swift */,
+				A1B2C3D0000000000000B106 /* SettingsView.swift */,
+				A1B2C3D0000000000000B107 /* HealthSync.swift */,
+				A1B2C3D0000000000000B108 /* DemoData.swift */,
 				A1B2C3D000000000000000B7 /* Assets.xcassets */,
 				A1B2C3D000000000000000B9 /* Info.plist */,
 				A1B2C3D000000000000000BA /* Aurelia.entitlements */,
@@ -104,6 +124,7 @@
 			children = (
 				A1B2C3D000000000000000B6 /* WellnessCore.swift */,
 				A1B2C3D000000000000000C3 /* DataExport.swift */,
+				A1B2C3D0000000000000B109 /* Presentation.swift */,
 			);
 			name = WellnessCore;
 			path = Sources/WellnessCore;
@@ -236,14 +257,21 @@
 			files = (
 				A1B2C3D000000000000000A0 /* AureliaApp.swift in Sources */,
 				A1B2C3D000000000000000A1 /* AppModels.swift in Sources */,
-				A1B2C3D000000000000000A2 /* DashboardViews.swift in Sources */,
-				A1B2C3D000000000000000A3 /* LoggingViews.swift in Sources */,
-				A1B2C3D000000000000000A4 /* HistorySettingsViews.swift in Sources */,
 				A1B2C3D000000000000000A5 /* Services.swift in Sources */,
 				A1B2C3D000000000000000A6 /* WellnessCore.swift in Sources */,
 				A1B2C3D000000000000000A9 /* Persistence.swift in Sources */,
 				A1B2C3D000000000000000AA /* ExportService.swift in Sources */,
 				A1B2C3D000000000000000AB /* DataExport.swift in Sources */,
+				A1B2C3D0000000000000A100 /* OnboardingView.swift in Sources */,
+				A1B2C3D0000000000000A101 /* TodayView.swift in Sources */,
+				A1B2C3D0000000000000A102 /* FoodViews.swift in Sources */,
+				A1B2C3D0000000000000A103 /* WorkoutViews.swift in Sources */,
+				A1B2C3D0000000000000A104 /* HistoryViews.swift in Sources */,
+				A1B2C3D0000000000000A105 /* ProgressViews.swift in Sources */,
+				A1B2C3D0000000000000A106 /* SettingsView.swift in Sources */,
+				A1B2C3D0000000000000A107 /* HealthSync.swift in Sources */,
+				A1B2C3D0000000000000A108 /* DemoData.swift in Sources */,
+				A1B2C3D0000000000000A109 /* Presentation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
