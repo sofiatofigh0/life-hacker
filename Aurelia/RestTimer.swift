@@ -73,6 +73,7 @@ final class RestTimer {
 
 /// Pinned to the bottom of a strength session.
 struct RestTimerBar: View {
+    static let presets: [Int] = [60, 90, 120, 180]
     @State private var timer = RestTimer.shared
     @AppStorage("aurelia.restSeconds") private var defaultSeconds = 90
 
@@ -89,14 +90,12 @@ struct RestTimerBar: View {
                 Button("Skip") { timer.cancel() }.buttonStyle(.bordered).controlSize(.small)
             } else {
                 Text("Rest").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                ForEach([60, 90, 120, 180], id: \.self) { seconds in
-                    Button(seconds < 120 ? "\(seconds)s" : "\(seconds / 60)m") {
+                ForEach(RestTimerBar.presets, id: \.self) { seconds in
+                    RestPresetButton(seconds: seconds, selected: seconds == defaultSeconds) {
                         defaultSeconds = seconds
                         timer.start(seconds: seconds)
                         Haptics.tap()
                     }
-                    .buttonStyle(seconds == defaultSeconds ? .borderedProminent : .bordered)
-                    .controlSize(.small)
                 }
                 Spacer()
             }
@@ -105,5 +104,23 @@ struct RestTimerBar: View {
         .padding(.vertical, 10)
         .background(.bar)
         .animation(.easeInOut(duration: 0.2), value: timer.isRunning)
+    }
+}
+
+/// One preset. Two button styles are two different types, so the choice is
+/// an `if`, not a ternary — the ternary form times out the type checker.
+private struct RestPresetButton: View {
+    let seconds: Int
+    let selected: Bool
+    let action: () -> Void
+
+    private var title: String { seconds < 120 ? "\(seconds)s" : "\(seconds / 60)m" }
+
+    var body: some View {
+        if selected {
+            Button(title, action: action).buttonStyle(.borderedProminent).controlSize(.small)
+        } else {
+            Button(title, action: action).buttonStyle(.bordered).controlSize(.small)
+        }
     }
 }
