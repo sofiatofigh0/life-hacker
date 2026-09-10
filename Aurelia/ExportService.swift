@@ -18,7 +18,7 @@ enum ExportService {
                           activity: $0.activityRaw, units: $0.unitRaw, goal: $0.goalRaw,
                           calorieTarget: $0.calorieTarget, proteinTarget: $0.proteinTarget,
                           stepTarget: $0.stepTarget, waterTargetLiters: $0.waterTargetLiters,
-                          onboarded: $0.onboarded, demoMode: $0.demoMode)
+                          onboarded: $0.onboarded, demoMode: false)
         }
 
         let workouts = try all(WorkoutEntity.self).map { workout in
@@ -32,7 +32,8 @@ enum ExportService {
                     WorkoutExerciseRecord(
                         exerciseName: exercise.name,
                         sets: exercise.sets.sorted { $0.order < $1.order }
-                            .map { ExerciseSetRecord(weightKG: $0.weightKG, reps: $0.reps) })
+                            .map { ExerciseSetRecord(weightKG: $0.weightKG, reps: $0.reps, completed: $0.completed, isWarmup: $0.isWarmup, rpe: $0.rpe) },
+                        notes: exercise.notes)
                 })
         }
 

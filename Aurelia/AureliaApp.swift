@@ -169,21 +169,45 @@ extension ShapeStyle where Self == Color {
 struct StoreFailureBanner: View {
     let message: String
     @State private var showDetail = false
+    @State private var confirmErase = false
+    @State private var erased = false
+    @State private var eraseError: String?
+
     var body: some View {
-        Button { showDetail.toggle() } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Saved data could not be opened", systemImage: "exclamationmark.triangle.fill")
-                    .font(.subheadline.weight(.semibold))
-                Text("Anything you log now will be lost when you quit. Your existing data is still on the device — do not delete the app.")
-                    .font(.caption)
-                if showDetail { Text(message).font(.caption2.monospaced()).padding(.top, 2) }
+        VStack(alignment: .leading, spacing: 8) {
+            Button { showDetail.toggle() } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(erased ? "Saved data erased" : "Saved data could not be opened", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline.weight(.semibold))
+                    Text(erased
+                         ? "Close Aurelia completely and open it again to start with an empty store."
+                         : "Anything you log now will be lost when you quit. Your existing data is still on the device — do not delete the app.")
+                        .font(.caption)
+                    if showDetail { Text(message).font(.caption2.monospaced()).padding(.top, 2) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color.orange.opacity(0.18))
+            .buttonStyle(.plain)
+            if !erased {
+                HStack {
+                    Button("Start fresh…", role: .destructive) { confirmErase = true }
+                    Text("Deletes the unreadable database. Export a copy first if you can.").font(.caption2).foregroundStyle(.secondary)
+                }
+                .font(.caption.weight(.semibold))
+            }
+            if let eraseError { Text(eraseError).font(.caption2).foregroundStyle(.red) }
         }
-        .buttonStyle(.plain)
+        .padding(12)
+        .background(Color.orange.opacity(0.18))
         .foregroundStyle(.primary)
+        .confirmationDialog("Erase the saved database?", isPresented: $confirmErase, titleVisibility: .visible) {
+            Button("Erase and start fresh", role: .destructive) {
+                do { try Persistence.eraseStore(); erased = true; Haptics.warning() }
+                catch { eraseError = "Could not erase: \(error.localizedDescription)" }
+            }
+        } message: {
+            Text("Every workout, meal, weight and photo record in the unreadable store is deleted. Photos files stay on disk but are no longer listed. This cannot be undone.")
+        }
     }
 }
 
@@ -271,24 +295,46 @@ struct HeaderButton: View {
     }
 }
 
-/// One row of the Today checklist.
+/// One row of the Today checklist. `progress` (0…1+) draws a thin bar under
+/// the detail so "how close" is visible without reading the numbers.
 struct ChecklistRow: View {
     let title: String
     let detail: String
     let done: Bool
     let icon: String
     var chevron = true
+    var progress: Double? = nil
+    var progressTint: Color = .sage
     var body: some View {
         HStack {
             Image(systemName: icon).frame(width: 30).foregroundStyle(.sage)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.headline)
                 Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                if let progress { ProgressBar(value: progress, tint: progressTint).padding(.top, 3) }
             }
             Spacer()
             if done { Image(systemName: "checkmark.circle.fill").foregroundStyle(.sage) }
             else if chevron { Image(systemName: "chevron.right").foregroundStyle(.secondary) }
         }
+    }
+}
+
+/// A 4-point capsule bar. Values above 1 fill the bar completely; the tint
+/// is how "over" is communicated.
+struct ProgressBar: View {
+    let value: Double
+    var tint: Color = .sage
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(tint.opacity(0.15))
+                Capsule().fill(tint).frame(width: proxy.size.width * min(1, max(0, value)))
+            }
+        }
+        .frame(height: 4)
+        .animation(.easeOut(duration: 0.3), value: value)
+        .accessibilityHidden(true)
     }
 }
 

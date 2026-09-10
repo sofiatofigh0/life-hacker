@@ -8,27 +8,37 @@ and sage interface is designed as a calm daily command center — not a gamified
 
 | Layer | State | Verified how |
 |---|---|---|
-| `WellnessCore` business logic, unit handling, export format | Working | `swift test` — 28/28 pass |
+| `WellnessCore` business logic, unit handling, export format, catalogs, insights | Working | `swift test` — 49/49 pass |
 | SwiftUI app sources | Parse clean, Swift 5 mode | `swiftc -parse` on every file |
 | Xcode project, scheme, asset catalog | Present and internally consistent | reference-integrity check |
 | Simulator build | Succeeded once (before the audit rewrite) | Xcode 26 on a Mac |
 | Audit rewrite type-checked on the iOS SDK | **Not yet** | next ⌘R on the Mac |
 
-The app has been through a full-screen audit (see [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for the register).
-The audit rewrote most of the view layer; it parses cleanly but the next ⌘R is its first real type check.
-Expect a round of diagnostics, as with every change so far.
+The app has been through a full-screen audit and a product-review pass (see
+[`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for the register and [`PRODUCT_REVIEW.md`](PRODUCT_REVIEW.md) for the
+walkthrough, the competitive comparison, and the fix list). Both rewrote most of the view layer; the code
+parses cleanly but the next ⌘R is its first real type check. Expect a round of diagnostics, as with every
+change so far. **This build migrates the data store from schema V1 to V2 on first launch.**
 
 ## What is implemented
 
 - Three-step onboarding with editable evidence-informed calorie/protein suggestions, units, activity, and goals.
-- Today checklist and centralized completion score for workouts, calorie consistency (90–110%), protein,
-  steps, water, and supplements. Active calories never increase the food target.
-- Recurring workout templates with weekday assignment, exercise search/reordering, defaults, immutable
-  session copies, editable sets, extra sets/exercises, cardio details, and completion history.
-- Meal-grouped food history, cached recent/frequent foods, gram-based macro math, manual foods, USDA proxy
-  search, Open Food Facts barcode lookup, and camera scanner.
-- Historical calendar/day editing, manual weight and 90-day trend chart with goal line, private
-  three-angle photos with thumbnails, and two-date comparison.
+- Today checklist with a greeting, remaining-calorie framing, progress bars, a streak, and a centralized
+  completion score for workouts, calorie consistency (90–110%), protein, steps, water, and supplements.
+  Active calories never increase the food target. The screen rolls over at midnight.
+- Recurring workout templates with weekday assignment, exercise search/reordering, default sets and rep
+  range, and one-tap repeat of any past session.
+- Strength sessions the way Strong and Hevy do them: last time's numbers as placeholders, tick a set to
+  complete it (adopting those numbers), a rest timer pinned to the bottom that notifies you when the phone is
+  locked, PR badges, warm-up and RPE per set, per-exercise notes, and a session summary (volume, sets,
+  live elapsed time). Finishing records the duration and tidies untouched sets. Every exercise has a
+  history chart and all-time best.
+- Meal-grouped food history with remaining-calorie framing, tap-to-edit entries, quick add, saved meals,
+  copy yesterday, add-and-log-another, cached recent/frequent foods, gram-based macro math, manual foods,
+  USDA proxy search, Open Food Facts barcode lookup, and camera scanner.
+- Historical calendar with a month summary, day editing, a week-vs-last-week card, manual weight and
+  90-day trend chart with goal line, private three-angle photos with thumbnails, comparison, and deletion.
+- Reminders: workout days (derived from the scheduled templates), an evening log check-in, and weekly photos.
 - **Apple Health sync**: steps, active and resting energy, and average heart rate are imported for the
   last 14 days on launch, on return to the foreground, and on demand. Weights logged in the app are written
   to Health; weights recorded elsewhere (a scale) are imported for days with no manual entry.
@@ -50,9 +60,11 @@ Your logs live in one SwiftData database inside the app's container. They surviv
    with an empty database (and the old one stays installed alongside).
 2. **You install over the top** — ⌘R from Xcode, or a rebuild after the 7-day free-team expiry. Never
    delete the app to "reinstall cleanly"; that deletes the database and the photos.
-3. **Model changes go through the migration plan** in `Aurelia/Persistence.swift`. Content that only
-   needs to grow — the exercise and food catalogs — is code, not schema, precisely so updates don't
-   migrate anything.
+3. **Model changes go through the migration plan** in `Aurelia/Persistence.swift`. Schema V1 is frozen
+   there and V2 (set completion, warm-up, RPE, exercise notes) migrates from it automatically. Content that
+   only needs to grow — the exercise and food catalogs — is code, not schema, precisely so updates don't
+   migrate anything. If a store ever fails to open, the orange banner offers **Start fresh**, which erases
+   it only after you confirm; the app never deletes data on its own.
 
 Your safety net is Settings → **Export all data (JSON)**. Do it before any update that mentions a schema
 change, and occasionally otherwise. **Restore from a backup** puts a file back (replace, not merge).
@@ -149,7 +161,8 @@ swift test
 
 Covers conversions, goals, no-eat-back behavior, food-by-weight macro math, completion scoring, template
 history snapshots, meal totals, trends, overrides, mocks, unit-aware display, meal inference, the JSON
-export format, and the legacy demo-fixture matching.
+export format, the legacy demo-fixture matching, the exercise and food catalogs, and the insight helpers
+(streaks, week windows, daily score index, pace, volume, greeting).
 
 On macOS, the app/unit build:
 
@@ -162,7 +175,8 @@ The `Aurelia` scheme is shared and committed, so this works without opening Xcod
 
 ## Known limitations / next work
 
-See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) — it lists what the audit fixed, what is deliberately deferred,
-and why. The short version of what is still missing: a dark-mode palette, an accessibility pass, Apple
-Watch workout import, background Health delivery, restore-from-export, saved meals, and the Swift 6
-migration.
+See [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) — it lists what each pass fixed, what is deliberately deferred,
+and why — and [`PRODUCT_REVIEW.md`](PRODUCT_REVIEW.md) for the comparison against MyFitnessPal, Strong,
+Hevy, MacroFactor and others. The short version of what is still missing: a dark-mode palette, an
+accessibility pass with VoiceOver, Apple Watch workout import, supersets, adaptive calorie targets,
+background Health delivery, and the Swift 6 migration.

@@ -15,13 +15,21 @@ struct FoodView: View {
     @State private var date = Date.now
     @State private var add = false
     @State private var library = false
+    @State private var editing: FoodLogEntity?
+    @State private var savingMeal: Meal?
+    @State private var mealName = ""
     @Query(sort: \FoodLogEntity.date) private var logs: [FoodLogEntity]
 
-    private var dayLogs: [FoodLogEntity] { logs.filter { Calendar.current.isDate($0.date, inSameDayAs: date) } }
+    private var calendar: Calendar { .current }
+    private var dayLogs: [FoodLogEntity] { logs.filter { calendar.isDate($0.date, inSameDayAs: date) } }
+    private var yesterdayLogs: [FoodLogEntity] {
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: date) else { return [] }
+        return logs.filter { calendar.isDate($0.date, inSameDayAs: yesterday) }
+    }
     private var total: Macro {
         dayLogs.reduce(Macro()) { $0 + .init(calories: $1.calories, protein: $1.protein, carbs: $1.carbs, fat: $1.fat) }
     }
-    private var isToday: Bool { Calendar.current.isDateInToday(date) }
+    private var isToday: Bool { calendar.isDateInToday(date) }
 
     var body: some View {
         TabScreen(eyebrow: "Nourishment", title: isToday ? "Today" : date.formatted(.dateTime.weekday(.abbreviated).month(.wide).day()),
@@ -33,15 +41,33 @@ struct FoodView: View {
         } content: {
             dayPicker
             totalsCard
+            if dayLogs.isEmpty && !yesterdayLogs.isEmpty {
+                Button {
+                    SavedMeals.copy(entries: yesterdayLogs, to: date, context: context)
+                    Haptics.success()
+                } label: {
+                    Label("Copy yesterday's \(yesterdayLogs.count) entries", systemImage: "doc.on.doc").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
             ForEach(Meal.allCases, id: \.self) { meal in mealCard(meal) }
         }
         .sheet(isPresented: $add) { NavigationStack { AddFoodView(date: logDate) { add = false } } }
         .sheet(isPresented: $library) { NavigationStack { FoodLibraryView() } }
+        .sheet(item: $editing) { entry in FoodEntryEditor(entry: entry) }
+        .alert("Save as a meal", isPresented: Binding(get: { savingMeal != nil }, set: { if !$0 { savingMeal = nil } }),
+               presenting: savingMeal) { meal in
+            TextField("Meal name", text: $mealName)
+            Button("Save") { saveMeal(meal) }
+            Button("Cancel", role: .cancel) {}
+        } message: { meal in
+            Text("Everything logged under \(meal.label) today becomes a one-tap meal in Add Food.")
+        }
     }
 
     /// Foods added to a past day are stamped at noon so they sort sensibly.
     private var logDate: Date {
-        isToday ? .now : Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: date) ?? date
+        isToday ? .now : calendar.date(bySettingHour: 12, minute: 0, second: 0, of: date) ?? date
     }
 
     private var dayPicker: some View {
@@ -56,15 +82,21 @@ struct FoodView: View {
     }
 
     private func shift(_ days: Int) {
-        if let next = Calendar.current.date(byAdding: .day, value: days, to: date) { date = min(next, .now) }
+        if let next = calendar.date(byAdding: .day, value: days, to: date) { date = min(next, .now) }
     }
+
+    // MARK: Totals
+
+    private var calorieTarget: Double { Double(profile.calorieTarget) }
+    private var proteinTarget: Double { Double(profile.proteinTarget) }
+    private var calorieRatio: Double { calorieTarget > 0 ? total.calories / calorieTarget : 0 }
 
     private var totalsCard: some View {
         WellnessCard {
-            HStack {
-                metric("Calories", total.calories, Double(profile.calorieTarget), "kcal")
+            HStack(alignment: .top) {
+                metric("Calories", value: total.calories, target: calorieTarget, unit: "kcal", over: calorieRatio > 1.1)
                 Divider()
-                metric("Protein", total.protein, Double(profile.proteinTarget), "g")
+                metric("Protein", value: total.protein, target: proteinTarget, unit: "g", over: false)
             }
             Divider().padding(.vertical, 8)
             HStack {
@@ -74,48 +106,81 @@ struct FoodView: View {
         }
     }
 
-    private func metric(_ title: String, _ value: Double, _ target: Double, _ unit: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func metric(_ title: String, value: Double, target: Double, unit: String, over: Bool) -> some View {
+        let remaining = Int(target - value)
+        return VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            Text("\(Int(value))").font(.system(.title, design: .serif, weight: .semibold))
-            Text("of \(Int(target)) \(unit)").font(.caption).foregroundStyle(.secondary)
+            Text(Int(value).formatted()).font(.system(.title, design: .serif, weight: .semibold))
+            Text(remaining >= 0 ? "\(remaining.formatted()) \(unit) left of \(Int(target).formatted())"
+                 : "\((-remaining).formatted()) \(unit) over \(Int(target).formatted())")
+                .font(.caption).foregroundStyle(over ? Color.orange : Color.secondary)
+            ProgressBar(value: target > 0 ? value / target : 0, tint: over ? .orange : .sage)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // MARK: Meals
+
     private func mealCard(_ meal: Meal) -> some View {
         let entries = dayLogs.filter { $0.mealRaw == meal.rawValue }
+        let calories = Int(entries.map(\.calories).reduce(0, +))
+        let protein = Int(entries.map(\.protein).reduce(0, +))
         return WellnessCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text(meal.label).font(.headline)
                     Spacer()
                     if !entries.isEmpty {
-                        Text("\(Int(entries.map(\.calories).reduce(0, +))) kcal").font(.subheadline).foregroundStyle(.secondary)
+                        Text("\(calories.formatted()) kcal · \(protein) g").font(.subheadline).foregroundStyle(.secondary)
+                        Menu {
+                            Button { mealName = ""; savingMeal = meal } label: { Label("Save as meal…", systemImage: "bookmark") }
+                        } label: {
+                            Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
+                        }
+                        .accessibilityLabel("\(meal.label) options")
                     }
                 }
                 if entries.isEmpty {
                     Text("Nothing logged").foregroundStyle(.secondary).font(.subheadline)
                 } else {
-                    ForEach(entries) { entry in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(entry.foodName)
-                                Text("\(Int(entry.grams)) g · \(Int(entry.protein)) g protein").font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text("\(Int(entry.calories)) kcal").font(.subheadline)
-                            // A ScrollView has no swipe actions; the original's delete was unreachable.
-                            Button { context.delete(entry); try? context.save() } label: {
-                                Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Remove \(entry.foodName)")
-                        }
-                    }
+                    ForEach(entries) { entry in entryRow(entry) }
                 }
             }
         }
+    }
+
+    private func entryRow(_ entry: FoodLogEntity) -> some View {
+        HStack {
+            Button { editing = entry } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(entry.foodName).foregroundStyle(.primary)
+                        Text(entry.grams > 0 ? "\(Int(entry.grams)) g · \(Int(entry.protein)) g protein" : "Quick add · \(Int(entry.protein)) g protein")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text("\(Int(entry.calories)) kcal").font(.subheadline).foregroundStyle(.primary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            // A ScrollView has no swipe actions; the original's delete was unreachable.
+            Button { context.delete(entry); try? context.save() } label: {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(entry.foodName)")
+        }
+    }
+
+    private func saveMeal(_ meal: Meal) {
+        let name = mealName.trimmingCharacters(in: .whitespaces)
+        let entries = dayLogs.filter { $0.mealRaw == meal.rawValue }
+        let items = entries.compactMap(SavedMeals.snapshot(from:))
+        guard !items.isEmpty else { return }
+        context.insert(SavedMealEntity(name: name.isEmpty ? "\(meal.label) · \(date.formatted(date: .abbreviated, time: .omitted))" : name, items: items))
+        try? context.save()
+        Haptics.success()
     }
 }
 
@@ -135,6 +200,7 @@ struct AddFoodView: View {
     @State private var error: String?
     @State private var scanner = false
     @State private var manual = false
+    @State private var quick = false
     @State private var manualPrefill: FoodSnapshot?
     @State private var selected: FoodEntity?
 
@@ -160,6 +226,7 @@ struct AddFoodView: View {
                     if loading { SwiftUI.ProgressView() }
                 }
                 Button { scanner = true } label: { Label("Scan barcode", systemImage: "barcode.viewfinder") }
+                Button { quick = true } label: { Label("Quick add calories", systemImage: "bolt") }
                 Button { manual = true } label: { Label("Create food manually", systemImage: "square.and.pencil") }
                 if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
             }
@@ -180,6 +247,7 @@ struct AddFoodView: View {
                 }
             }
             if query.isEmpty {
+                SavedMealsSection(date: date, onLogged: onDone)
                 if !favorites.isEmpty { Section("Favorites") { ForEach(favorites) { foodRow($0) } } }
                 if !recent.isEmpty { Section("Recent") { ForEach(recent) { foodRow($0) } } }
                 if !frequent.isEmpty { Section("Frequent") { ForEach(frequent) { foodRow($0) } } }
@@ -187,7 +255,7 @@ struct AddFoodView: View {
                     NavigationLink { StaplesBrowser { selected = $0 } } label: { Label("Browse staples by category", systemImage: "leaf") }
                     NavigationLink { FoodLibraryView(onPick: { selected = $0 }) } label: { Label("All saved foods", systemImage: "books.vertical") }
                 } footer: {
-                    Text("Type a name to search your saved foods and the built-in staples\(searchAvailable ? ", then press Search for online results" : ""). Packaged products: scan the barcode.")
+                    Text("Type a name to search your saved foods and the built-in staples\(searchAvailable ? ", then press Search for online results" : ""). Packaged products: scan the barcode. Restaurant meal or a label you won't reuse: Quick add.")
                 }
             }
         }
@@ -195,6 +263,7 @@ struct AddFoodView: View {
         .toolbar { Button("Cancel") { dismiss() } }
         .navigationDestination(item: $selected) { food in FoodAmountView(food: food, date: date, onDone: onDone) }
         .sheet(isPresented: $scanner) { BarcodeScannerView { code in scanner = false; lookup(code) } }
+        .sheet(isPresented: $quick) { QuickAddView(date: date) { quick = false; onDone() } }
         .sheet(isPresented: $manual) {
             ManualFoodView(prefill: manualPrefill) { food in manual = false; manualPrefill = nil; selected = food }
         }
@@ -287,6 +356,7 @@ struct AddFoodView: View {
 
 struct FoodAmountView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
     let food: FoodEntity
     let date: Date
     var onDone: () -> Void
@@ -300,6 +370,7 @@ struct FoodAmountView: View {
     }
 
     private var scale: Double { (grams ?? 0) / 100 }
+    private var canLog: Bool { (grams ?? 0) > 0 }
 
     var body: some View {
         Form {
@@ -316,18 +387,25 @@ struct FoodAmountView: View {
                 LabeledContent("Carbs", value: "\(Int(food.carbs100 * scale)) g")
                 LabeledContent("Fat", value: "\(Int(food.fat100 * scale)) g")
             }
-            Button("Add to \(meal.label)") {
-                context.insert(FoodLogEntity(date: date, meal: meal, food: food, grams: grams ?? 0))
-                food.useCount += 1
-                food.lastUsed = .now
-                try? context.save()
-                Haptics.success()
-                onDone()
+            Section {
+                Button("Add to \(meal.label)") { log(); onDone() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canLog)
+                // Logging a whole plate is several foods; going back to the
+                // search each time is the friction every tracker gets wrong.
+                Button("Add & log another") { log(); dismiss() }
+                    .disabled(!canLog)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled((grams ?? 0) <= 0)
         }
         .navigationTitle("Serving")
+    }
+
+    private func log() {
+        context.insert(FoodLogEntity(date: date, meal: meal, food: food, grams: grams ?? 0))
+        food.useCount += 1
+        food.lastUsed = .now
+        try? context.save()
+        Haptics.success()
     }
 }
 

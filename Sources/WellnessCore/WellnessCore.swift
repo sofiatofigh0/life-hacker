@@ -103,11 +103,14 @@ public struct SavedMeal: Identifiable, Codable, Equatable, Sendable {
 }
 public struct ExerciseSetRecord: Identifiable, Codable, Equatable, Sendable {
     public var id = UUID(); public var weightKG: Double; public var reps: Int
-    public init(weightKG: Double = 0, reps: Int = 0) { self.weightKG = weightKG; self.reps = reps }
+    public var completed: Bool?; public var isWarmup: Bool?; public var rpe: Int?
+    public init(weightKG: Double = 0, reps: Int = 0, completed: Bool? = nil, isWarmup: Bool? = nil, rpe: Int? = nil) {
+        self.weightKG = weightKG; self.reps = reps; self.completed = completed; self.isWarmup = isWarmup; self.rpe = rpe
+    }
 }
 public struct WorkoutExerciseRecord: Identifiable, Codable, Equatable, Sendable {
-    public var id = UUID(); public var exerciseName: String; public var sets: [ExerciseSetRecord]
-    public init(exerciseName: String, sets: [ExerciseSetRecord]) { self.exerciseName = exerciseName; self.sets = sets }
+    public var id = UUID(); public var exerciseName: String; public var sets: [ExerciseSetRecord]; public var notes: String?
+    public init(exerciseName: String, sets: [ExerciseSetRecord], notes: String? = nil) { self.exerciseName = exerciseName; self.sets = sets; self.notes = notes }
 }
 public struct WorkoutTemplateValue: Identifiable, Codable, Equatable, Sendable {
     public var id = UUID(); public var name: String; public var exercises: [WorkoutExerciseRecord]

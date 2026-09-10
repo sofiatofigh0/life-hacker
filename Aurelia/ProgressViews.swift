@@ -10,9 +10,13 @@ struct ProgressTabView: View {
     let profile: AppProfile
     @Query(sort: \WeightEntity.date) private var weights: [WeightEntity]
     @Query(sort: \PhotoSetEntity.date, order: .reverse) private var photos: [PhotoSetEntity]
+    @Query private var workouts: [WorkoutEntity]
+    @Query private var logs: [FoodLogEntity]
+    @Query private var activities: [ActivityEntity]
     @State private var addPhoto = false
     @State private var compare = false
     @State private var logWeight = false
+    @State private var managePhotos = false
 
     private var units: UnitSystem { profile.units }
     private var latest: WeightEntity? { weights.last }
@@ -28,6 +32,7 @@ struct ProgressTabView: View {
         TabScreen(eyebrow: "Progress", title: "The long view") {
             HeaderButton(systemImage: "plus", label: "Log weight") { logWeight = true }
         } content: {
+            weekCard
             goalCard
             if !chartWeights.isEmpty { chartCard }
             photosCard
@@ -35,7 +40,79 @@ struct ProgressTabView: View {
         .sheet(isPresented: $addPhoto) { PhotoCaptureFlow() }
         .sheet(isPresented: $compare) { PhotoCompareView(photos: photos) }
         .sheet(isPresented: $logWeight) { WeightEntryView(profile: profile, date: .now) }
+        .sheet(isPresented: $managePhotos) { NavigationStack { PhotoSetsView() } }
     }
+
+    // MARK: This week vs last
+
+    private struct WeekStats {
+        var workouts = 0
+        var calories: Double?
+        var protein: Double?
+        var steps: Double?
+        var weightKG: Double?
+    }
+
+    private func stats(for week: WeekWindow) -> WeekStats {
+        var stats = WeekStats()
+        stats.workouts = workouts.filter { $0.completed && week.contains($0.date) }.count
+        let weekLogs = logs.filter { week.contains($0.date) }
+        let calorieDays: [(date: Date, value: Double)] = weekLogs.map { (date: $0.date, value: $0.calories) }
+        let proteinDays: [(date: Date, value: Double)] = weekLogs.map { (date: $0.date, value: $0.protein) }
+        stats.calories = Aggregate.mean(Array(Aggregate.dailyTotals(calorieDays).values))
+        stats.protein = Aggregate.mean(Array(Aggregate.dailyTotals(proteinDays).values))
+        stats.steps = Aggregate.mean(activities.filter { week.contains($0.date) && $0.steps > 0 }.map(\.steps))
+        stats.weightKG = Aggregate.mean(weights.filter { week.contains($0.date) }.map(\.kilograms))
+        return stats
+    }
+
+    private var weekCard: some View {
+        let thisWeek = WeekWindow.current(containing: .now)
+        let now = stats(for: thisWeek)
+        let last = stats(for: thisWeek.previous)
+        return WellnessCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("This week").font(.headline)
+                    Spacer()
+                    Text("vs last week").font(.caption).foregroundStyle(.secondary)
+                }
+                weekRow("Workouts", value: "\(now.workouts)", delta: Double(now.workouts - last.workouts), format: { "\(Int($0))" })
+                weekRow("Avg calories", value: now.calories.map { Int($0).formatted() + " kcal" } ?? "—",
+                        delta: diff(now.calories, last.calories), format: { Int($0).formatted() })
+                weekRow("Avg protein", value: now.protein.map { "\(Int($0)) g" } ?? "—",
+                        delta: diff(now.protein, last.protein), format: { "\(Int($0)) g" })
+                weekRow("Avg steps", value: now.steps.map { Int($0).formatted() } ?? "—",
+                        delta: diff(now.steps, last.steps), format: { Int($0).formatted() })
+                weekRow("Avg weight", value: now.weightKG.map { units.formatWeight(kilograms: $0) } ?? "—",
+                        delta: diff(now.weightKG, last.weightKG),
+                        format: { units.displayWeight(kilograms: $0).formatted(.number.precision(.fractionLength(1))) + " " + units.weightUnit })
+            }
+        }
+    }
+
+    private func diff(_ a: Double?, _ b: Double?) -> Double? {
+        guard let a, let b else { return nil }
+        return a - b
+    }
+
+    private func weekRow(_ title: String, value: String, delta: Double?, format: (Double) -> String) -> some View {
+        HStack {
+            Text(title).foregroundStyle(.secondary)
+            Spacer()
+            Text(value).font(.subheadline.weight(.semibold))
+            if let delta, abs(delta) >= 0.05 {
+                Text((delta > 0 ? "+" : "−") + format(abs(delta)))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(width: 84, alignment: .trailing)
+            } else {
+                Text(delta == nil ? "" : "same").font(.caption).foregroundStyle(.tertiary).frame(width: 84, alignment: .trailing)
+            }
+        }
+        .font(.subheadline)
+    }
+
+    // MARK: Weight
 
     private var goalCard: some View {
         WellnessCard {
@@ -57,6 +134,7 @@ struct ProgressTabView: View {
                         .font(.caption).foregroundStyle(.tertiary)
                 } else {
                     Text("Log a weight to begin your trend.").foregroundStyle(.secondary)
+                    Button("Log weight") { logWeight = true }.buttonStyle(.bordered)
                 }
             }
         }
@@ -90,10 +168,16 @@ struct ProgressTabView: View {
         }
     }
 
+    // MARK: Photos
+
     private var photosCard: some View {
         WellnessCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Progress photos").font(.headline)
+                HStack {
+                    Text("Progress photos").font(.headline)
+                    Spacer()
+                    if !photos.isEmpty { Button("Manage") { managePhotos = true }.font(.subheadline) }
+                }
                 if photos.isEmpty {
                     Text("Weekly front, side, and back photos stay in the app's private storage and are never uploaded.")
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -185,6 +269,50 @@ enum ProgressPhotoStore {
     static var directory: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
     static func url(for filename: String) -> URL { directory.appendingPathComponent(filename) }
     static func image(for filename: String) -> UIImage? { UIImage(contentsOfFile: url(for: filename).path) }
+
+    /// Removes the three files behind a set. Missing files are not an error.
+    static func deleteFiles(of set: PhotoSetEntity) {
+        for name in [set.front, set.side, set.back] where !name.isEmpty {
+            try? FileManager.default.removeItem(at: url(for: name))
+        }
+    }
+}
+
+/// Every photo set, newest first, with swipe to delete (files included).
+struct PhotoSetsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Query(sort: \PhotoSetEntity.date, order: .reverse) private var photos: [PhotoSetEntity]
+    @State private var pending: PhotoSetEntity?
+
+    var body: some View {
+        List {
+            ForEach(photos) { set in
+                HStack(spacing: 8) {
+                    ProgressPhoto(filename: set.front).frame(width: 40, height: 54)
+                    ProgressPhoto(filename: set.side).frame(width: 40, height: 54)
+                    ProgressPhoto(filename: set.back).frame(width: 40, height: 54)
+                    Text(set.date.formatted(date: .abbreviated, time: .omitted)).padding(.leading, 6)
+                    Spacer()
+                }
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { pending = set } label: { Label("Delete", systemImage: "trash") }
+                }
+            }
+            if photos.isEmpty { Text("No photo sets yet.").foregroundStyle(.secondary) }
+        }
+        .navigationTitle("Photo Sets")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { Button("Done") { dismiss() } }
+        .confirmationDialog("Delete this photo set?", isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
+                            presenting: pending) { set in
+            Button("Delete photos from \(set.date.formatted(date: .abbreviated, time: .omitted))", role: .destructive) {
+                ProgressPhotoStore.deleteFiles(of: set)
+                context.delete(set)
+                try? context.save()
+            }
+        } message: { _ in Text("The three image files are removed from the app's storage as well.") }
+    }
 }
 
 struct ProgressPhoto: View {

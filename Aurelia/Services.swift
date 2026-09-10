@@ -239,4 +239,45 @@ enum NotificationService {
     static func isWeeklyPhotoScheduled() async -> Bool {
         await UNUserNotificationCenter.current().pendingNotificationRequests().contains { $0.identifier == weeklyPhotoIdentifier }
     }
+
+    // MARK: Workout reminders
+
+    static let workoutPrefix = "workout-reminder-"
+
+    /// One repeating reminder per scheduled template weekday, at the given hour.
+    static func scheduleWorkoutReminders(templates: [(name: String, weekday: Int)], hour: Int, minute: Int) async throws {
+        await cancelWorkoutReminders()
+        let center = UNUserNotificationCenter.current()
+        for template in templates where (1...7).contains(template.weekday) {
+            let content = UNMutableNotificationContent()
+            content.title = "Today: \(template.name)"
+            content.body = "Your scheduled session is ready on the Today tab."
+            content.sound = .default
+            let trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: hour, minute: minute, weekday: template.weekday), repeats: true)
+            try await center.add(.init(identifier: workoutPrefix + String(template.weekday), content: content, trigger: trigger))
+        }
+    }
+
+    static func cancelWorkoutReminders() async {
+        let center = UNUserNotificationCenter.current()
+        let ids = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(workoutPrefix) }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+
+    // MARK: Daily log reminder
+
+    static let dailyLogIdentifier = "daily-log"
+
+    static func scheduleDailyLogReminder(hour: Int, minute: Int) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = "How did today go?"
+        content.body = "Log your meals, water, and weight before the day closes."
+        content.sound = .default
+        let trigger = UNCalendarNotificationTrigger(dateMatching: DateComponents(hour: hour, minute: minute), repeats: true)
+        try await UNUserNotificationCenter.current().add(.init(identifier: dailyLogIdentifier, content: content, trigger: trigger))
+    }
+
+    static func cancelDailyLogReminder() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [dailyLogIdentifier])
+    }
 }

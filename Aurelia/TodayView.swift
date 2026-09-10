@@ -1,8 +1,10 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 struct TodayView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     let profile: AppProfile
 
     @Query(sort: \WorkoutEntity.date, order: .reverse) private var workouts: [WorkoutEntity]
@@ -19,11 +21,14 @@ struct TodayView: View {
     @State private var showSettings = false
     @State private var showWeight = false
     @State private var startedWorkout: WorkoutEntity?
+    /// "Today" is state, not `Date.now`, so the screen rolls over at midnight
+    /// and when the app returns to the foreground on a new day.
+    @State private var today = Date.now
 
     // MARK: Derived
 
     private var calendar: Calendar { .current }
-    private func isToday(_ date: Date) -> Bool { calendar.isDateInToday(date) }
+    private func isToday(_ date: Date) -> Bool { calendar.isDate(date, inSameDayAs: today) }
 
     private var macros: Macro {
         logs.filter { isToday($0.date) }.reduce(Macro()) { $0 + Macro(calories: $1.calories, protein: $1.protein, carbs: $1.carbs, fat: $1.fat) }
@@ -33,39 +38,40 @@ struct TodayView: View {
     private var todaysWorkout: WorkoutEntity? {
         workouts.first { isToday($0.date) && $0.completed } ?? workouts.first { isToday($0.date) }
     }
-    private var workoutDone: Bool { todaysWorkout?.completed == true }
     private var scheduledTemplate: TemplateEntity? {
-        let weekday = calendar.component(.weekday, from: .now)
+        let weekday = calendar.component(.weekday, from: today)
         return templates.first { $0.weekday == weekday }
     }
     private var todaysWeight: WeightEntity? { weights.first { isToday($0.date) } }
-    private var supplementFraction: Double {
-        supplements.isEmpty ? 1 : Double(checks.filter { isToday($0.date) }.count) / Double(supplements.count)
-    }
+    private var checkedToday: Int { checks.filter { isToday($0.date) }.count }
     private var calorieRatio: Double { profile.calorieTarget > 0 ? macros.calories / Double(profile.calorieTarget) : 0 }
-    private var score: Double {
-        CompletionCalculator.score(.init(workout: workoutDone, calories: macros.calories, calorieTarget: Double(profile.calorieTarget),
-                                         protein: macros.protein, proteinTarget: Double(profile.proteinTarget),
-                                         steps: steps, stepTarget: Double(profile.stepTarget),
-                                         waterLiters: water, waterTargetLiters: profile.waterTargetLiters,
-                                         supplementFraction: supplementFraction))
+    private var caloriesInRange: Bool { (0.9...1.1).contains(calorieRatio) }
+    private var caloriesOver: Bool { calorieRatio > 1.1 }
+
+    private var index: DailyScoreIndex {
+        DailyScoreIndex(profile: profile, logs: logs, workouts: workouts, activities: activities,
+                        waters: waters, checks: checks, supplementCount: supplements.count)
     }
 
     // MARK: Body
 
     var body: some View {
-        TabScreen(eyebrow: "Today", title: Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day())) {
+        let index = self.index
+        let score = index.score(on: today)
+        let streak = Streak.consecutiveDays(scoreForDay: { index.score(on: $0) }, threshold: 0.7, today: today, calendar: calendar)
+        TabScreen(eyebrow: today.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+                  title: Greeting.text(hour: calendar.component(.hour, from: today), name: profile.name)) {
             HeaderButton(systemImage: "gearshape", label: "Settings") { showSettings = true }
         } content: {
-            completionCard
+            completionCard(score: score, streak: streak)
             workoutCard
             NavigationLink { FoodView(profile: profile, embedded: true) } label: {
-                card(ChecklistRow(title: "Calories", detail: "\(Int(macros.calories)) / \(profile.calorieTarget) kcal",
-                                  done: (0.9...1.1).contains(calorieRatio), icon: "fork.knife"))
+                card(ChecklistRow(title: "Calories", detail: calorieDetail, done: caloriesInRange, icon: "fork.knife",
+                                  progress: calorieRatio, progressTint: caloriesOver ? .orange : .sage))
             }.buttonStyle(.plain)
             NavigationLink { FoodView(profile: profile, embedded: true) } label: {
-                card(ChecklistRow(title: "Protein", detail: "\(Int(macros.protein)) / \(profile.proteinTarget) g",
-                                  done: macros.protein >= Double(profile.proteinTarget), icon: "leaf"))
+                card(ChecklistRow(title: "Protein", detail: proteinDetail, done: macros.protein >= Double(profile.proteinTarget), icon: "leaf",
+                                  progress: profile.proteinTarget > 0 ? macros.protein / Double(profile.proteinTarget) : 0))
             }.buttonStyle(.plain)
             stepsCard
             waterCard
@@ -80,11 +86,35 @@ struct TodayView: View {
         .sheet(isPresented: $showSettings) { NavigationStack { SettingsView(profile: profile) } }
         .sheet(isPresented: $showWeight) { WeightEntryView(profile: profile, date: .now) }
         .navigationDestination(item: $startedWorkout) { WorkoutEditor(workout: $0, profile: profile) }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in today = .now }
+        .onChange(of: scenePhase) { _, phase in if phase == .active { today = .now } }
     }
 
     private func card(_ row: ChecklistRow) -> some View { WellnessCard { row } }
 
-    private var completionCard: some View {
+    // MARK: Copy
+
+    private var calorieDetail: String {
+        let eaten = Int(macros.calories)
+        let target = profile.calorieTarget
+        guard eaten > 0 else { return "\(target.formatted()) kcal today" }
+        let diff = target - eaten
+        if diff >= 0 { return "\(diff.formatted()) left · \(eaten.formatted()) of \(target.formatted())" }
+        return "\((-diff).formatted()) over · \(eaten.formatted()) of \(target.formatted())"
+    }
+
+    private var proteinDetail: String {
+        let eaten = Int(macros.protein)
+        let target = profile.proteinTarget
+        guard eaten > 0 else { return "\(target) g today" }
+        let diff = target - eaten
+        if diff > 0 { return "\(diff) g to go · \(eaten) of \(target) g" }
+        return "Target met · \(eaten) of \(target) g"
+    }
+
+    // MARK: Cards
+
+    private func completionCard(score: Double, streak: Int) -> some View {
         WellnessCard {
             HStack(spacing: 16) {
                 ZStack {
@@ -94,10 +124,15 @@ struct TodayView: View {
                 }
                 .frame(width: 82, height: 82)
                 .animation(.easeOut(duration: 0.4), value: score)
+                .accessibilityLabel("Daily completion \(Int(score * 100)) percent")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(profile.goal.label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     Text("Daily completion").font(.title3.weight(.semibold))
-                    Text("Activity never increases your calorie allowance.").font(.caption).foregroundStyle(.secondary)
+                    if streak > 0 {
+                        Label("\(streak)-day streak", systemImage: "flame.fill").font(.caption).foregroundStyle(.orange)
+                    } else {
+                        Text("Reach 70% to start a streak.").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -124,7 +159,8 @@ struct TodayView: View {
         Button { Task { await sync.sync(context: context) } } label: {
             WellnessCard {
                 VStack(alignment: .leading, spacing: 6) {
-                    ChecklistRow(title: "Steps", detail: stepsDetail, done: steps >= Double(profile.stepTarget), icon: "figure.walk", chevron: false)
+                    ChecklistRow(title: "Steps", detail: stepsDetail, done: steps >= Double(profile.stepTarget), icon: "figure.walk", chevron: false,
+                                 progress: profile.stepTarget > 0 ? steps / Double(profile.stepTarget) : 0)
                     if let error = sync.lastError {
                         Text(error).font(.caption2).foregroundStyle(.red)
                     } else if let last = sync.lastSynced {
@@ -146,7 +182,8 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 12) {
                 ChecklistRow(title: "Water",
                              detail: "\(profile.units.formatWater(liters: water)) / \(profile.units.formatWater(liters: profile.waterTargetLiters))",
-                             done: water >= profile.waterTargetLiters, icon: "drop", chevron: false)
+                             done: water >= profile.waterTargetLiters, icon: "drop", chevron: false,
+                             progress: profile.waterTargetLiters > 0 ? water / profile.waterTargetLiters : 0)
                 HStack {
                     ForEach(profile.units.waterQuickAdds, id: \.self) { amount in
                         Button(profile.units.waterQuickAddLabel(liters: amount)) {
@@ -170,7 +207,13 @@ struct TodayView: View {
     private var supplementsCard: some View {
         WellnessCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Supplements").font(.headline)
+                HStack {
+                    Text("Supplements").font(.headline)
+                    Spacer()
+                    if !supplements.isEmpty {
+                        Text("\(checkedToday) / \(supplements.count)").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
                 if supplements.isEmpty {
                     Text("Add supplements in Settings to track them here.").font(.subheadline).foregroundStyle(.secondary)
                 }

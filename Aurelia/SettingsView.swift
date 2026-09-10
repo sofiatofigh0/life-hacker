@@ -2,16 +2,40 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+/// Reminder preferences live in UserDefaults; the scheduled notifications are
+/// derived from them plus the templates, so both Settings and the schedule
+/// editor can rebuild them.
+enum ReminderSettings {
+    static let workoutOnKey = "aurelia.workoutReminder"
+    static let workoutMinutesKey = "aurelia.workoutReminderMinutes"
+    static let dailyOnKey = "aurelia.dailyReminder"
+    static let dailyMinutesKey = "aurelia.dailyReminderMinutes"
+    static let defaultWorkoutMinutes = 7 * 60 + 30
+    static let defaultDailyMinutes = 20 * 60 + 30
+
+    /// Reschedules workout reminders from the current templates if the
+    /// reminder is on. Safe to call whenever templates change.
+    @MainActor
+    static func refreshWorkoutReminders(templates: [TemplateEntity]) async {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: workoutOnKey) else { return }
+        let minutes = defaults.object(forKey: workoutMinutesKey) as? Int ?? defaultWorkoutMinutes
+        let scheduled: [(name: String, weekday: Int)] = templates.filter { $0.weekday > 0 }.map { (name: $0.name, weekday: $0.weekday) }
+        try? await NotificationService.scheduleWorkoutReminders(templates: scheduled, hour: minutes / 60, minute: minutes % 60)
+    }
+}
+
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     let profile: AppProfile
     @Query(sort: \SupplementEntity.order) private var supplements: [SupplementEntity]
+    @Query(sort: \TemplateEntity.weekday) private var templates: [TemplateEntity]
 
     @State private var sync = HealthSync.shared
     @State private var demo = DemoModeController.shared
     @State private var newSupplement = ""
-    @State private var reminderOn = false
+    @State private var photoReminderOn = false
     @State private var reminderNote: String?
     @State private var exportFile: ExportFile?
     @State private var exportError: String?
@@ -21,6 +45,13 @@ struct SettingsView: View {
     @State private var pendingRestore: AureliaExport?
     @State private var restoreMessage: String?
 
+    @AppStorage(ReminderSettings.workoutOnKey) private var workoutReminderOn = false
+    @AppStorage(ReminderSettings.workoutMinutesKey) private var workoutMinutes = ReminderSettings.defaultWorkoutMinutes
+    @AppStorage(ReminderSettings.dailyOnKey) private var dailyReminderOn = false
+    @AppStorage(ReminderSettings.dailyMinutesKey) private var dailyMinutes = ReminderSettings.defaultDailyMinutes
+    @AppStorage("aurelia.restSeconds") private var restSeconds = 90
+    @AppStorage("aurelia.autoRest") private var autoRest = true
+
     private var units: UnitSystem { profile.units }
 
     var body: some View {
@@ -28,13 +59,16 @@ struct SettingsView: View {
             goalSection
             profileSection
             supplementsSection
+            trainingSection
             healthSection
             remindersSection
             dataSection
             demoSection
-            Section("Privacy") {
-                Text("Health data and progress photos remain on this device. Only food search text is sent to nutrition providers.")
+            Section {
+                Text("Health data and progress photos remain on this device. Only food search text and barcodes are sent to nutrition providers.")
                     .font(.footnote)
+            } header: { Text("Privacy") } footer: {
+                Text(versionFooter).padding(.top, 8)
             }
         }
         .navigationTitle("Settings")
@@ -57,7 +91,7 @@ struct SettingsView: View {
         } message: { export in
             Text("Backup from \(export.exportedAt.formatted(date: .abbreviated, time: .shortened)). Everything currently in the app will be removed first. Export a copy of the current data before you do this if you might want it back.")
         }
-        .task { reminderOn = await NotificationService.isWeeklyPhotoScheduled() }
+        .task { photoReminderOn = await NotificationService.isWeeklyPhotoScheduled() }
         .alert("Old demo data", isPresented: Binding(get: { cleanupReport != nil }, set: { if !$0 { cleanupReport = nil } }),
                presenting: cleanupReport) { report in
             if report.total > 0 {
@@ -71,6 +105,12 @@ struct SettingsView: View {
                  ? "Found \(report.summary) matching the fixtures an earlier build wrote into your real records. Remove them?"
                  : "No demo fixtures found in your records.")
         }
+    }
+
+    private var versionFooter: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "Aurelia \(version) (\(build)) · data schema \(Persistence.schemaVersionString)"
     }
 
     // MARK: Sections
@@ -91,6 +131,7 @@ struct SettingsView: View {
                                                  weightKG: profile.currentKG, activity: profile.activity, mode: profile.goal)
                 profile.calorieTarget = r.calories
                 profile.proteinTarget = r.proteinGrams
+                Haptics.success()
             }
         } header: { Text("Daily targets") } footer: {
             Text("Recalculate uses your current weight, height, age, activity, and goal. Activity never adds calories back.")
@@ -119,10 +160,16 @@ struct SettingsView: View {
     }
 
     private var supplementsSection: some View {
-        Section("Supplements") {
+        Section {
             ForEach(supplements) { Text($0.name) }
                 .onDelete { offsets in
                     offsets.map { supplements[$0] }.forEach(context.delete)
+                    try? context.save()
+                }
+                .onMove { from, to in
+                    var reordered = supplements
+                    reordered.move(fromOffsets: from, toOffset: to)
+                    for (index, supplement) in reordered.enumerated() { supplement.order = index }
                     try? context.save()
                 }
             HStack {
@@ -136,6 +183,23 @@ struct SettingsView: View {
                 }
                 .disabled(newSupplement.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+        } header: {
+            HStack {
+                Text("Supplements")
+                Spacer()
+                if supplements.count > 1 { EditButton().font(.caption) }
+            }
+        }
+    }
+
+    private var trainingSection: some View {
+        Section {
+            Picker("Default rest", selection: $restSeconds) {
+                Text("1:00").tag(60); Text("1:30").tag(90); Text("2:00").tag(120); Text("3:00").tag(180)
+            }
+            Toggle("Start rest timer when a set is ticked", isOn: $autoRest)
+        } header: { Text("Training") } footer: {
+            Text("The rest timer runs at the bottom of a strength session and notifies you when it ends, even with the phone locked.")
         }
     }
 
@@ -173,20 +237,56 @@ struct SettingsView: View {
     }
 
     private var remindersSection: some View {
-        Section("Reminders") {
-            Toggle("Weekly photo reminder (Sunday 9 am)", isOn: $reminderOn)
-                .onChange(of: reminderOn) { _, on in
+        Section {
+            Toggle("Workout days", isOn: $workoutReminderOn)
+                .onChange(of: workoutReminderOn) { _, on in
                     Task {
                         if on {
-                            let granted = (try? await NotificationService.request()) ?? false
-                            if granted { try? await NotificationService.scheduleWeeklyPhotos(); reminderNote = nil }
-                            else { reminderOn = false; reminderNote = "Notifications are off for Aurelia in iOS Settings." }
+                            guard await ensurePermission() else { workoutReminderOn = false; return }
+                            await ReminderSettings.refreshWorkoutReminders(templates: templates)
+                        } else {
+                            await NotificationService.cancelWorkoutReminders()
+                        }
+                    }
+                }
+            if workoutReminderOn {
+                DatePicker("Time", selection: minutesBinding($workoutMinutes), displayedComponents: .hourAndMinute)
+                    .onChange(of: workoutMinutes) { _, _ in Task { await ReminderSettings.refreshWorkoutReminders(templates: templates) } }
+                if templates.allSatisfy({ $0.weekday == 0 }) {
+                    Text("No template has a scheduled weekday yet. Set one in Workout → Weekly schedule.").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            Toggle("Evening log check-in", isOn: $dailyReminderOn)
+                .onChange(of: dailyReminderOn) { _, on in
+                    Task {
+                        if on {
+                            guard await ensurePermission() else { dailyReminderOn = false; return }
+                            try? await NotificationService.scheduleDailyLogReminder(hour: dailyMinutes / 60, minute: dailyMinutes % 60)
+                        } else {
+                            NotificationService.cancelDailyLogReminder()
+                        }
+                    }
+                }
+            if dailyReminderOn {
+                DatePicker("Time", selection: minutesBinding($dailyMinutes), displayedComponents: .hourAndMinute)
+                    .onChange(of: dailyMinutes) { _, minutes in
+                        Task { try? await NotificationService.scheduleDailyLogReminder(hour: minutes / 60, minute: minutes % 60) }
+                    }
+            }
+            Toggle("Weekly photo reminder (Sunday 9 am)", isOn: $photoReminderOn)
+                .onChange(of: photoReminderOn) { _, on in
+                    Task {
+                        if on {
+                            guard await ensurePermission() else { photoReminderOn = false; return }
+                            try? await NotificationService.scheduleWeeklyPhotos()
                         } else {
                             NotificationService.cancelWeeklyPhotos()
                         }
                     }
                 }
             if let reminderNote { Text(reminderNote).font(.footnote).foregroundStyle(.secondary) }
+        } header: { Text("Reminders") } footer: {
+            Text("Workout reminders fire on the weekdays your templates are scheduled. The evening check-in nudges you to log meals, water, and weight.")
         }
     }
 
@@ -235,7 +335,24 @@ struct SettingsView: View {
                                                                 fromDisplay: { units.liters(fromDisplayWater: $0) })
     }
 
+    /// Minutes-since-midnight as a Date for `DatePicker`; only the time of day is kept.
+    private func minutesBinding(_ minutes: Binding<Int>) -> Binding<Date> {
+        Binding<Date>(
+            get: { Calendar.current.date(bySettingHour: minutes.wrappedValue / 60, minute: minutes.wrappedValue % 60, second: 0, of: .now) ?? .now },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                minutes.wrappedValue = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+            })
+    }
+
     // MARK: Actions
+
+    private func ensurePermission() async -> Bool {
+        let granted = (try? await NotificationService.request()) ?? false
+        reminderNote = granted ? nil : "Notifications are off for Aurelia in iOS Settings."
+        if !granted { Haptics.warning() }
+        return granted
+    }
 
     private func export() {
         exportError = nil

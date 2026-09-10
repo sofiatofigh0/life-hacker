@@ -1,24 +1,57 @@
 import Foundation
 import SwiftData
 
-/// Version 1 of the on-disk schema.
+// MARK: - Schema versions
+
+/// Version 1: the shapes the first builds shipped with. Only the models that
+/// changed in V2 are frozen here; unchanged models are shared with V2 by
+/// reference. SwiftData needs the old shape to compute the migration.
 ///
-/// **When you change a model, do this — not a plain edit:**
-/// 1. Copy the *current* model definitions into a `AureliaSchemaV1` namespace so
-///    the old shape survives (SwiftData needs both shapes to migrate between them).
-/// 2. Add `AureliaSchemaV2` with the new shape and a bumped `versionIdentifier`.
-/// 3. Add a `MigrationStage` to `AureliaMigrationPlan.stages` describing the move.
-///
-/// Additive changes — a new optional property, a new model — are handled by
-/// SwiftData's lightweight migration and need only a `.lightweight` stage.
-/// Renames, type changes, and required properties without defaults need
-/// `.custom`, or the store will fail to open.
-///
-/// Note: `AppProfile.demoMode` is no longer read (demo mode moved to
-/// UserDefaults so it can switch containers), but the column stays so V1 is
-/// unchanged. Remove it in V2.
+/// Never edit these — they describe what is on disk in older installs.
 enum AureliaSchemaV1: VersionedSchema {
     static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
+         SessionExerciseEntity.self, SetEntity.self, FoodEntity.self, FoodLogEntity.self,
+         SavedMealEntity.self, WaterEntity.self, SupplementEntity.self, SupplementCheckEntity.self,
+         WeightEntity.self, ActivityEntity.self, PhotoSetEntity.self]
+    }
+
+    @Model final class AppProfile {
+        var name: String; var age: Int; var sexRaw: String; var heightCM: Double; var currentKG: Double; var goalKG: Double
+        var targetDate: Date; var activityRaw: String; var unitRaw: String; var goalRaw: String
+        var calorieTarget: Int; var proteinTarget: Int; var stepTarget: Int; var waterTargetLiters: Double
+        var onboarded: Bool; var demoMode: Bool
+        init() {
+            name = ""; age = 30; sexRaw = "female"; heightCM = 165; currentKG = 70; goalKG = 65; targetDate = .now
+            activityRaw = "1.55"; unitRaw = "imperial"; goalRaw = "maintain"; calorieTarget = 1900; proteinTarget = 110
+            stepTarget = 10_000; waterTargetLiters = 1.9; onboarded = false; demoMode = false
+        }
+    }
+    @Model final class WorkoutEntity {
+        var date: Date; var name: String; var completed: Bool; var isCardio: Bool; var durationMinutes: Double
+        var distanceKM: Double?; var incline: Double?; var speedKPH: Double?; var calories: Double?; var averageHeartRate: Double?; var notes: String
+        @Relationship(deleteRule: .cascade) var exercises: [SessionExerciseEntity]
+        init() { date = .now; name = ""; completed = false; isCardio = false; durationMinutes = 0; notes = ""; exercises = [] }
+    }
+    @Model final class SessionExerciseEntity {
+        var name: String; var order: Int; @Relationship(deleteRule: .cascade) var sets: [SetEntity]
+        init() { name = ""; order = 0; sets = [] }
+    }
+    @Model final class SetEntity {
+        var order: Int; var weightKG: Double; var reps: Int
+        init() { order = 0; weightKG = 0; reps = 0 }
+    }
+}
+
+/// Version 2 (current). Changes from V1, all additive or removals that
+/// lightweight migration handles:
+/// - `SetEntity`: + `completed`, `isWarmup`, `rpe`, inverse `exercise`
+/// - `SessionExerciseEntity`: + `notes`, inverse `workout`
+/// - `AppProfile`: − `demoMode` (demo mode lives in UserDefaults)
+enum AureliaSchemaV2: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
@@ -30,29 +63,36 @@ enum AureliaSchemaV1: VersionedSchema {
 
 /// The ordered history of schema versions. SwiftData walks this to bring an
 /// older store forward to the current one.
+///
+/// **Adding V3:** freeze the V2 shapes of any model you change into
+/// `AureliaSchemaV2` (as V1 does above), define V3 with the new shapes, append
+/// it to `schemas`, and add a stage. Additive changes are `.lightweight`;
+/// renames, type changes, and required fields without defaults need `.custom`.
 enum AureliaMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self] }
+    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self, AureliaSchemaV2.self] }
 
-    /// One stage per version-to-version hop. Empty while there is only V1.
-    static var stages: [MigrationStage] { [] }
+    static var stages: [MigrationStage] {
+        [.lightweight(fromVersion: AureliaSchemaV1.self, toVersion: AureliaSchemaV2.self)]
+    }
 }
 
+// MARK: - Containers
+
 enum Persistence {
-    static let schema = Schema(versionedSchema: AureliaSchemaV1.self)
+    static let schema = Schema(versionedSchema: AureliaSchemaV2.self)
 
     /// A human-readable version string, recorded in every export.
     static var schemaVersionString: String {
-        let v = AureliaSchemaV1.versionIdentifier
+        let v = AureliaSchemaV2.versionIdentifier
         return "\(v.major).\(v.minor).\(v.patch)"
     }
 
     /// Opens the real store, migrating if needed.
     ///
     /// If it cannot be opened, this falls back to an in-memory container and
-    /// returns the error rather than crashing or deleting anything. That matters:
-    /// the store file is the only copy of the user's history, so a failed
-    /// migration must leave it untouched on disk for recovery. The previous
-    /// `try!` turned any schema mismatch into a launch crash loop.
+    /// returns the error rather than crashing or deleting anything. The store
+    /// file stays on disk for recovery; `eraseStore()` is the explicit,
+    /// user-confirmed way to start over.
     @MainActor
     static func makeContainer() -> (container: ModelContainer, failure: String?) {
         do {
@@ -66,6 +106,17 @@ enum Persistence {
             // cannot realistically fail; if it did there would be nothing to run.
             let fallback = try! ModelContainer(for: schema, configurations: scratch)
             return (fallback, String(describing: error))
+        }
+    }
+
+    /// Deletes the on-disk store so the next launch starts empty. Only ever
+    /// called from the failure banner after the user confirms.
+    static func eraseStore() throws {
+        let url = ModelConfiguration(schema: schema).url
+        let manager = FileManager.default
+        for suffix in ["", "-shm", "-wal"] {
+            let file = URL(fileURLWithPath: url.path + suffix)
+            if manager.fileExists(atPath: file.path) { try manager.removeItem(at: file) }
         }
     }
 

@@ -4,11 +4,26 @@ This is the register from the full-app audit. Everything here was found by readi
 tracing every data flow; the items marked **fixed** shipped in the audit commit, and the rest are
 deliberately deferred with the reason. Severity is about impact on a person using the app daily.
 
-Status of verification: the audit fixes parse cleanly and the pure-logic layer passes 28 tests on Linux.
-They have **not** been type-checked against the iOS SDK or run on a device — that happens on the Mac.
-Expect a round of compiler diagnostics on the first ⌘R, as with every previous change.
+Status of verification: every Swift file parses cleanly in Swift 5 mode and the pure-logic layer passes
+49 tests on Linux. Changes have **not** been type-checked against the iOS SDK or run on a device — that
+happens on the Mac. Expect a round of compiler diagnostics on the first ⌘R, as with every previous change.
+
+The product-review pass (see [`PRODUCT_REVIEW.md`](PRODUCT_REVIEW.md)) is the most recent set of changes
+and includes the first real schema migration (V1 → V2).
 
 ---
+
+## Added in the product-review pass
+
+| # | Item |
+|---|---|
+| R1 | **Schema V2.** `SetEntity` gains `completed`, `isWarmup`, `rpe`; `SessionExerciseEntity` gains `notes`; explicit inverse relationships; `AppProfile.demoMode` dropped. V1 is frozen in `Persistence.swift` and a lightweight stage migrates on first launch. Closes X14. |
+| R2 | Strength sessions: set completion, rest timer with notification, previous-performance placeholders, PR badge, warm-up/RPE, per-exercise notes, session summary, finish that records duration and prunes empty sets, repeat any workout, exercise history chart. |
+| R3 | Food: edit a logged entry (closes X8), quick add, add-and-log-another, copy yesterday, saved meals (closes X7). |
+| R4 | Today: greeting, remaining framing, streak, progress bars, midnight rollover (closes X16). |
+| R5 | Progress: week-vs-last-week card; photo set management with file deletion (closes X9). |
+| R6 | Settings: workout-day and evening reminders, rest-timer defaults, supplement reorder (closes X12), version footer. Store-failure banner gains "Start fresh". |
+| R7 | `DailyScoreIndex` in WellnessCore buckets logs by day once; Today and the calendar score days from it (closes X15 for the two screens that mattered). |
 
 ## Added after the audit
 
@@ -106,22 +121,24 @@ The profile has always stored metric and had a units picker, but almost no scree
 |---|---|---|
 | X4 | **Import Apple Health workouts** (Apple Watch sessions) and de-duplicate against manual logs. | Read authorization is already requested. The hard part is de-duplication rules (a Watch "Traditional Strength Training" vs. the app's logged session at the same time) and that deserves its own design. |
 | X5 | **Background Health delivery** (`HKObserverQuery` + background delivery) so steps update without opening the app. | Requires the Background Modes capability and careful battery behaviour. Foreground sync on launch/return covers daily use. |
-| X7 | **Saved meals UI.** `SavedMealEntity` and totals exist in the model; there is no screen. | Real feature, not a fix. |
-| X8 | **Edit a logged food's amount** in place. | Today you remove and re-add. Small, but touches the food-log snapshot design. |
-| X9 | **Delete or replace a photo set**, and export photos. | Photo files are managed by filename; deletion needs to remove the files too. |
+| ~~X7~~ | Saved meals UI. | **Done** in the product-review pass (R3). |
+| ~~X8~~ | Edit a logged food's amount in place. | **Done** (R3): macros rescale from the ratio they were logged at. |
+| ~~X9~~ | Delete a photo set. | **Done** (R5): Progress → Manage removes the row and the three files. Photo export is still open. |
 | X10 | **Food amounts in ounces** for imperial users. | Nutrition data is per 100 g everywhere; a display-only oz conversion is straightforward but needs the serving UI reworked. |
 | X19 | **Merge on restore.** Restore is replace-only. | Merge needs duplicate rules per record type; replace is predictable and covers the backup use case. |
 | X11 | **Exercise demonstration media.** | Needs licensed assets. |
-| X12 | **Reorder supplements** (drag). Order is stored; there is no reorder control. | Trivial once the list is in edit mode; skipped to keep Settings simple. |
+| X20 | **Supersets / circuits.** | Changes the session model (grouping) and the set-row layout; do it after the new session screen has been used for a few weeks. |
+| X21 | **Adaptive calorie targets** from intake and weight trend (MacroFactor-style). | Needs 2–3 weeks of consistent logs to be meaningful and a careful explanation in the UI. |
+| ~~X12~~ | Reorder supplements. | **Done** (R6). |
 
 ### Engineering
 
 | # | Item | Why deferred |
 |---|---|---|
 | X13 | **Swift 6 language mode.** The project is on Swift 5 mode. | Moving to 6 surfaces strict-concurrency diagnostics across SwiftData/HealthKit/AVFoundation code. Worth doing once the app is stable on device, not while it is still getting its first builds. |
-| X14 | **Schema V2**: drop `AppProfile.demoMode` (unused since demo mode moved to UserDefaults); add explicit inverse relationships. | Any schema change should be the first real exercise of the migration plan, done deliberately with a backup taken first. Not worth the risk for a dead column. |
-| X15 | **`@Query` with predicates instead of filtering in memory.** Every screen fetches all rows and filters by date. | Fine at personal scale (thousands of rows). Revisit if the calendar gets slow after a year of data. |
-| X16 | **Today does not roll over at midnight** while open. | Cosmetic; force-quit or switch tabs. |
+| ~~X14~~ | Schema V2. | **Done** (R1), once there was a feature that needed it. The banner's "Start fresh" is the escape hatch if the migration fails. |
+| X15 | **`@Query` with predicates instead of filtering in memory.** Every screen fetches all rows and filters by date. | Today and the calendar now score from a per-day index built once per render (R7). Predicates are still worth doing for the day-detail and food screens if they slow down after a year of data. |
+| ~~X16~~ | Today does not roll over at midnight. | **Done** (R4). |
 | X17 | **Nutrition proxy hardening** (rate limiting, auth) before any public use. | The Supabase function is intentionally open for a single user. |
 | X18 | **Unit tests for SwiftData-backed logic** (sync upserts, demo cleanup, export mapping) via an in-memory container in the `AureliaTests` target. | These need the iOS SDK; they belong on the Mac, run with ⌘U. |
 

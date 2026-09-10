@@ -55,7 +55,11 @@ enum ImportService {
         for w in export.workouts {
             let exercises = w.exercises.enumerated().map { index, exercise in
                 SessionExerciseEntity(name: exercise.exerciseName, order: index,
-                                      sets: exercise.sets.enumerated().map { setIndex, set in SetEntity(order: setIndex, weightKG: set.weightKG, reps: set.reps) })
+                                      sets: exercise.sets.enumerated().map { setIndex, set in
+                                          SetEntity(order: setIndex, weightKG: set.weightKG, reps: set.reps,
+                                                    completed: set.completed ?? (set.reps > 0), isWarmup: set.isWarmup ?? false, rpe: set.rpe)
+                                      },
+                                      notes: exercise.notes ?? "")
             }
             let workout = WorkoutEntity(date: w.date, name: w.name, completed: w.completed, isCardio: w.isCardio,
                                         durationMinutes: w.durationMinutes, exercises: exercises)

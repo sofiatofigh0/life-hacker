@@ -77,7 +77,7 @@ enum DemoData {
                     var sets: [SetEntity] = []
                     for setIndex in 0..<3 {
                         let reps: Int = 8 + Int(rng.next() % 4)
-                        sets.append(SetEntity(order: setIndex, weightKG: weight, reps: reps))
+                        sets.append(SetEntity(order: setIndex, weightKG: weight, reps: reps, completed: true))
                     }
                     exercises.append(SessionExerciseEntity(name: name, order: index, sets: sets))
                 }
