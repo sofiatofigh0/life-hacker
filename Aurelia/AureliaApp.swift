@@ -41,6 +41,8 @@ final class DemoModeController {
     private(set) var isEnabled: Bool
     /// Bumped to rebuild the demo container from scratch.
     private(set) var generation = 0
+    /// Bumped after a restore so every view re-fetches against the new rows.
+    private(set) var viewGeneration = 0
 
     private init() { isEnabled = UserDefaults.standard.bool(forKey: Self.key) }
 
@@ -56,6 +58,7 @@ final class DemoModeController {
     }
 
     func reset() { generation += 1 }
+    func rebuildViews() { viewGeneration += 1 }
 }
 
 /// Chooses between the real store and a throwaway demo store, and rebuilds the
@@ -70,7 +73,7 @@ struct ContainerSwitcher: View {
         let active = demo.isEnabled ? (demoContainer ?? real) : real
         RootView(storeFailure: demo.isEnabled ? nil : storeFailure)
             .modelContainer(active)
-            .id("\(demo.isEnabled)-\(demo.generation)-\(demoContainer == nil)")
+            .id("\(demo.isEnabled)-\(demo.generation)-\(demo.viewGeneration)-\(demoContainer == nil)")
             // A cream and sage palette is designed for light appearance; the
             // cards use `.background`, which went black in dark mode.
             .preferredColorScheme(.light)

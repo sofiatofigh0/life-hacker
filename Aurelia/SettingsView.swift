@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +17,9 @@ struct SettingsView: View {
     @State private var exportError: String?
     @State private var cleanupReport: DemoCleanup.Report?
     @State private var cleanupResult: String?
+    @State private var showImporter = false
+    @State private var pendingRestore: AureliaExport?
+    @State private var restoreMessage: String?
 
     private var units: UnitSystem { profile.units }
 
@@ -36,6 +40,23 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .toolbar { Button("Done") { try? context.save(); dismiss() } }
         .sheet(item: $exportFile) { file in ShareSheet(url: file.url) }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
+            switch result {
+            case .success(let url):
+                do { pendingRestore = try ImportService.preview(url: url) }
+                catch { restoreMessage = error.localizedDescription; Haptics.warning() }
+            case .failure(let error):
+                restoreMessage = error.localizedDescription
+            }
+        }
+        .alert("Replace everything with this backup?",
+               isPresented: Binding(get: { pendingRestore != nil }, set: { if !$0 { pendingRestore = nil } }),
+               presenting: pendingRestore) { export in
+            Button("Replace with \(export.recordCount) records", role: .destructive) { restore(export) }
+            Button("Cancel", role: .cancel) {}
+        } message: { export in
+            Text("Backup from \(export.exportedAt.formatted(date: .abbreviated, time: .shortened)). Everything currently in the app will be removed first. Export a copy of the current data before you do this if you might want it back.")
+        }
         .task { reminderOn = await NotificationService.isWeeklyPhotoScheduled() }
         .alert("Old demo data", isPresented: Binding(get: { cleanupReport != nil }, set: { if !$0 { cleanupReport = nil } }),
                presenting: cleanupReport) { report in
@@ -174,13 +195,17 @@ struct SettingsView: View {
             Button { export() } label: { Label("Export all data (JSON)", systemImage: "square.and.arrow.up") }
             if let exportError { Text(exportError).font(.footnote).foregroundStyle(.red) }
             if !demo.isEnabled {
+                Button { showImporter = true } label: { Label("Restore from a backup…", systemImage: "square.and.arrow.down") }
+                if let restoreMessage { Text(restoreMessage).font(.footnote).foregroundStyle(.secondary) }
+            }
+            if !demo.isEnabled {
                 Button { cleanupReport = DemoCleanup.scan(context: context) } label: {
                     Label("Check for old demo data", systemImage: "magnifyingglass")
                 }
                 if let cleanupResult { Text(cleanupResult).font(.footnote).foregroundStyle(.secondary) }
             }
         } header: { Text("Your data") } footer: {
-            Text("Export writes every log to a JSON file you can save to Files, AirDrop, or email. Progress photos are listed by filename, not embedded. \"Check for old demo data\" finds rows an earlier build's demo mode wrote into your real records.")
+            Text("Export writes every log to a JSON file you can save to Files, AirDrop, or email. Restore replaces everything with a backup file. Progress photos are listed by filename, not embedded. \"Check for old demo data\" finds rows an earlier build's demo mode wrote into your real records.")
         }
     }
 
@@ -221,6 +246,21 @@ struct SettingsView: View {
             Haptics.success()
         } catch {
             exportError = "Export failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func restore(_ export: AureliaExport) {
+        // Leave this screen first: it holds the profile that is about to be deleted.
+        dismiss()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            do {
+                try ImportService.restore(export, context: context)
+                Haptics.success()
+            } catch {
+                Haptics.warning()
+            }
+            DemoModeController.shared.rebuildViews()
         }
     }
 

@@ -58,6 +58,7 @@ enum Persistence {
         do {
             let container = try ModelContainer(for: schema, migrationPlan: AureliaMigrationPlan.self)
             seedExerciseLibrary(into: container)
+            seedFoodStaples(into: container)
             return (container, nil)
         } catch {
             let scratch = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
@@ -79,20 +80,56 @@ enum Persistence {
         let config = ModelConfiguration("AureliaDemo", schema: schema, isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: config)
         seedExerciseLibrary(into: container)
+        seedFoodStaples(into: container)
         DemoData.seed(into: container)
         return container
     }
 
-    /// The built-in exercise list, inserted once. `ExerciseEntity.name` is unique,
-    /// so re-running is harmless.
+    /// Inserts any `FoodCatalog` staple that is not already in the food list.
+    /// Insert-only: a staple the user has edited keeps their values, because
+    /// the catalog's numbers are typical figures and theirs may be from a label.
+    @MainActor
+    private static func seedFoodStaples(into container: ModelContainer) {
+        let context = container.mainContext
+        let existing = (try? context.fetch(FetchDescriptor<FoodEntity>())) ?? []
+        let names = Set(existing.filter { $0.brand.isEmpty }.map(\.name))
+        var changed = false
+        for staple in FoodCatalog.all where !names.contains(staple.name) {
+            context.insert(FoodEntity(name: staple.name, calories100: staple.per100.calories, protein100: staple.per100.protein,
+                                      carbs100: staple.per100.carbs, fat100: staple.per100.fat, servingGrams: staple.servingGrams))
+            changed = true
+        }
+        if changed { try? context.save() }
+    }
+
+    /// Brings the stored exercise library up to date with `ExerciseCatalog`.
+    ///
+    /// Runs on every launch and is cheap: new catalog entries are inserted,
+    /// built-in entries get the catalog's current summary and tips, and
+    /// anything the user created (`isCustom`) is left exactly as it is. This is
+    /// how the library grows in an update without a schema change.
     @MainActor
     private static func seedExerciseLibrary(into container: ModelContainer) {
         let context = container.mainContext
-        let count = (try? context.fetchCount(FetchDescriptor<ExerciseEntity>())) ?? 0
-        guard count == 0 else { return }
-        for (name, summary, tips) in SeedData.exercises {
-            context.insert(ExerciseEntity(name, summary: summary, tips: tips))
+        let existing = (try? context.fetch(FetchDescriptor<ExerciseEntity>())) ?? []
+        var byName = [String: ExerciseEntity]()
+        for entity in existing { byName[entity.name] = entity }
+
+        var changed = false
+        for definition in ExerciseCatalog.all {
+            if let entity = byName[definition.name] {
+                guard !entity.isCustom else { continue }
+                let tips = definition.tips.joined(separator: "\n")
+                if entity.summary != definition.summary || entity.tips != tips {
+                    entity.summary = definition.summary
+                    entity.tips = tips
+                    changed = true
+                }
+            } else {
+                context.insert(ExerciseEntity(definition.name, summary: definition.summary, tips: definition.tips))
+                changed = true
+            }
         }
-        try? context.save()
+        if changed { try? context.save() }
     }
 }

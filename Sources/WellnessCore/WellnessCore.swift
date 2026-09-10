@@ -8,7 +8,7 @@ public enum ActivityLevel: Double, Codable, CaseIterable, Sendable {
 }
 public enum Meal: String, Codable, CaseIterable, Sendable { case breakfast, lunch, dinner, snacks }
 
-public struct Macro: Codable, Equatable, Sendable {
+public struct Macro: Codable, Hashable, Sendable {
     public var calories: Double; public var protein: Double; public var carbs: Double; public var fat: Double
     public init(calories: Double = 0, protein: Double = 0, carbs: Double = 0, fat: Double = 0) {
         self.calories = calories; self.protein = protein; self.carbs = carbs; self.fat = fat

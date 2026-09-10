@@ -26,6 +26,10 @@
 		A1B2C3D0000000000000A107 /* HealthSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B107 /* HealthSync.swift */; };
 		A1B2C3D0000000000000A108 /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B108 /* DemoData.swift */; };
 		A1B2C3D0000000000000A109 /* Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B109 /* Presentation.swift */; };
+		A1B2C3D0000000000000A10A /* ImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B10A /* ImportService.swift */; };
+		A1B2C3D0000000000000A10B /* FoodLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B10B /* FoodLibraryView.swift */; };
+		A1B2C3D0000000000000A10C /* ExerciseCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B10C /* ExerciseCatalog.swift */; };
+		A1B2C3D0000000000000A10D /* FoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B10D /* FoodCatalog.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +68,10 @@
 		A1B2C3D0000000000000B107 /* HealthSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSync.swift; sourceTree = "<group>"; };
 		A1B2C3D0000000000000B108 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
 		A1B2C3D0000000000000B109 /* Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B10A /* ImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportService.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B10B /* FoodLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodLibraryView.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B10C /* ExerciseCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalog.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B10D /* FoodCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodCatalog.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +120,8 @@
 				A1B2C3D0000000000000B106 /* SettingsView.swift */,
 				A1B2C3D0000000000000B107 /* HealthSync.swift */,
 				A1B2C3D0000000000000B108 /* DemoData.swift */,
+				A1B2C3D0000000000000B10A /* ImportService.swift */,
+				A1B2C3D0000000000000B10B /* FoodLibraryView.swift */,
 				A1B2C3D000000000000000B7 /* Assets.xcassets */,
 				A1B2C3D000000000000000B9 /* Info.plist */,
 				A1B2C3D000000000000000BA /* Aurelia.entitlements */,
@@ -125,6 +135,8 @@
 				A1B2C3D000000000000000B6 /* WellnessCore.swift */,
 				A1B2C3D000000000000000C3 /* DataExport.swift */,
 				A1B2C3D0000000000000B109 /* Presentation.swift */,
+				A1B2C3D0000000000000B10C /* ExerciseCatalog.swift */,
+				A1B2C3D0000000000000B10D /* FoodCatalog.swift */,
 			);
 			name = WellnessCore;
 			path = Sources/WellnessCore;
@@ -272,6 +284,10 @@
 				A1B2C3D0000000000000A107 /* HealthSync.swift in Sources */,
 				A1B2C3D0000000000000A108 /* DemoData.swift in Sources */,
 				A1B2C3D0000000000000A109 /* Presentation.swift in Sources */,
+				A1B2C3D0000000000000A10A /* ImportService.swift in Sources */,
+				A1B2C3D0000000000000A10B /* FoodLibraryView.swift in Sources */,
+				A1B2C3D0000000000000A10C /* ExerciseCatalog.swift in Sources */,
+				A1B2C3D0000000000000A10D /* FoodCatalog.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

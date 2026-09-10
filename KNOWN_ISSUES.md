@@ -10,6 +10,16 @@ Expect a round of compiler diagnostics on the first ⌘R, as with every previous
 
 ---
 
+## Added after the audit
+
+| # | Item |
+|---|---|
+| A1 | Exercise library grown from 13 to ~170 entries across 12 muscle groups and 8 equipment types, with form cues. Kept as code (`ExerciseCatalog`) and upserted by name on launch — no schema change, custom exercises untouched. Picker groups by muscle group with an equipment filter. |
+| A2 | Built-in food staples (~130 whole foods and common items, per 100 g with typical servings) seeded insert-only, so "chicken" or "rice" works offline. Browse by category from Add Food. |
+| A3 | Food Library screen: browse, search (name, brand, barcode), favorite, edit, delete every saved food. Scanned products accumulate here and the scanner checks it before going online. |
+| A4 | Barcode lookup falls back to USDA branded foods via the nutrition proxy (`/barcode`) when Open Food Facts has no nutrition data. Optional; needs the proxy configured. |
+| A5 | **Restore from backup** (Settings → Your data). Replace-only, with a count-and-date confirmation. Custom exercises are now included in exports. |
+
 ## Fixed in the audit
 
 ### Data sync (the "not syncing" report)
@@ -96,11 +106,11 @@ The profile has always stored metric and had a units picker, but almost no scree
 |---|---|---|
 | X4 | **Import Apple Health workouts** (Apple Watch sessions) and de-duplicate against manual logs. | Read authorization is already requested. The hard part is de-duplication rules (a Watch "Traditional Strength Training" vs. the app's logged session at the same time) and that deserves its own design. |
 | X5 | **Background Health delivery** (`HKObserverQuery` + background delivery) so steps update without opening the app. | Requires the Background Modes capability and careful battery behaviour. Foreground sync on launch/return covers daily use. |
-| X6 | **Restore from a JSON export.** | Export exists; import is the inverse but needs conflict rules (merge vs. replace) and a UI. The file format is versioned to make this possible. |
 | X7 | **Saved meals UI.** `SavedMealEntity` and totals exist in the model; there is no screen. | Real feature, not a fix. |
 | X8 | **Edit a logged food's amount** in place. | Today you remove and re-add. Small, but touches the food-log snapshot design. |
 | X9 | **Delete or replace a photo set**, and export photos. | Photo files are managed by filename; deletion needs to remove the files too. |
 | X10 | **Food amounts in ounces** for imperial users. | Nutrition data is per 100 g everywhere; a display-only oz conversion is straightforward but needs the serving UI reworked. |
+| X19 | **Merge on restore.** Restore is replace-only. | Merge needs duplicate rules per record type; replace is predictable and covers the backup use case. |
 | X11 | **Exercise demonstration media.** | Needs licensed assets. |
 | X12 | **Reorder supplements** (drag). Order is stored; there is no reorder control. | Trivial once the list is in edit mode; skipped to keep Settings simple. |
 

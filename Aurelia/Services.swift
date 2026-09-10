@@ -36,6 +36,27 @@ struct RemoteNutritionService: NutritionProvider {
     }
 
     func barcodeLookup(_ code: String) async throws -> BarcodeResult? {
+        let open = try await openFoodFactsLookup(code)
+        if let open, open.hasNutritionData { return open }
+        // Second source: USDA branded foods via the proxy, when configured.
+        if let viaProxy = try? await proxyBarcodeLookup(code), viaProxy.hasNutritionData { return viaProxy }
+        return open
+    }
+
+    private func proxyBarcodeLookup(_ code: String) async throws -> BarcodeResult? {
+        guard let proxyURL else { return nil }
+        var components = URLComponents(url: proxyURL.appendingPathComponent("barcode"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [.init(name: "code", value: code)]
+        guard let url = components?.url else { return nil }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        guard let snapshot = try JSONDecoder().decode([FoodSnapshot].self, from: data).first else { return nil }
+        let m = snapshot.nutrientsPer100Grams
+        let hasData = m.calories > 0 || m.protein > 0 || m.carbs > 0 || m.fat > 0
+        return BarcodeResult(snapshot: snapshot, hasNutritionData: hasData)
+    }
+
+    private func openFoodFactsLookup(_ code: String) async throws -> BarcodeResult? {
         // Scanned codes are digits, but never interpolate untrusted input into a URL.
         var components = URLComponents(string: "https://world.openfoodfacts.org/api/v2/product/")
         components?.path += code + ".json"

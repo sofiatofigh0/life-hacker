@@ -36,8 +36,26 @@ Expect a round of diagnostics, as with every change so far.
 - **Demo mode** runs against a separate in-memory store with a generated five-week history. Your own
   records are never modified by it. Settings can also scan for — and remove — fixtures that an earlier
   build's demo mode wrote into the real database.
-- Versioned SwiftData schema with a migration plan, a store that never self-deletes on failure, and a
-  JSON export of every record from Settings.
+- Versioned SwiftData schema with a migration plan, a store that never self-deletes on failure, and
+  JSON **export and restore** of every record from Settings.
+- A ~170-exercise library (grouped by muscle group and equipment, with form cues) and ~130 built-in food
+  staples, both kept as code and merged into the store by name on launch — so they can grow in any update
+  without touching your data. A Food Library screen lets you edit, favorite, and delete saved foods.
+
+## Keeping your data across updates
+
+Your logs live in one SwiftData database inside the app's container. They survive an update as long as:
+
+1. **The bundle identifier does not change.** iOS keys the container to it. Changing it is a different app
+   with an empty database (and the old one stays installed alongside).
+2. **You install over the top** — ⌘R from Xcode, or a rebuild after the 7-day free-team expiry. Never
+   delete the app to "reinstall cleanly"; that deletes the database and the photos.
+3. **Model changes go through the migration plan** in `Aurelia/Persistence.swift`. Content that only
+   needs to grow — the exercise and food catalogs — is code, not schema, precisely so updates don't
+   migrate anything.
+
+Your safety net is Settings → **Export all data (JSON)**. Do it before any update that mentions a schema
+change, and occasionally otherwise. **Restore from a backup** puts a file back (replace, not merge).
 
 ## Requirements
 

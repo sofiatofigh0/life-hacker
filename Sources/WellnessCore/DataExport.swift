@@ -26,6 +26,9 @@ public struct AureliaExport: Codable, Equatable, Sendable {
     public var weights: [WeightRecord]
     public var activity: [ActivityRecord]
     public var photoSets: [PhotoSetRecord]
+    /// Exercises the user created themselves. Optional so exports written
+    /// before this field existed still decode.
+    public var customExercises: [CustomExerciseRecord]?
 
     public init(formatVersion: Int = AureliaExport.currentFormatVersion,
                 exportedAt: Date = .now,
@@ -40,7 +43,8 @@ public struct AureliaExport: Codable, Equatable, Sendable {
                 supplementChecks: [SupplementCheckRecord] = [],
                 weights: [WeightRecord] = [],
                 activity: [ActivityRecord] = [],
-                photoSets: [PhotoSetRecord] = []) {
+                photoSets: [PhotoSetRecord] = [],
+                customExercises: [CustomExerciseRecord]? = nil) {
         self.formatVersion = formatVersion
         self.exportedAt = exportedAt
         self.schemaVersion = schemaVersion
@@ -55,13 +59,15 @@ public struct AureliaExport: Codable, Equatable, Sendable {
         self.weights = weights
         self.activity = activity
         self.photoSets = photoSets
+        self.customExercises = customExercises
     }
 
     /// Total rows in the export, for the confirmation the app shows the user.
     public var recordCount: Int {
-        (profile == nil ? 0 : 1) + templates.count + workouts.count + foods.count + foodLogs.count
-            + water.count + supplements.count + supplementChecks.count + weights.count
-            + activity.count + photoSets.count
+        let counts: [Int] = [profile == nil ? 0 : 1, templates.count, workouts.count, foods.count, foodLogs.count,
+                             water.count, supplements.count, supplementChecks.count, weights.count,
+                             activity.count, photoSets.count, customExercises?.count ?? 0]
+        return counts.reduce(0, +)
     }
 
     /// The encoder every export is written with. Dates are ISO 8601 so the file
@@ -79,6 +85,11 @@ public struct AureliaExport: Codable, Equatable, Sendable {
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }
+}
+
+public struct CustomExerciseRecord: Codable, Equatable, Sendable {
+    public var name: String, summary: String, tips: [String]
+    public init(name: String, summary: String, tips: [String]) { self.name = name; self.summary = summary; self.tips = tips }
 }
 
 public struct ProfileRecord: Codable, Equatable, Sendable {

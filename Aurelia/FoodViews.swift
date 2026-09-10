@@ -14,6 +14,7 @@ struct FoodView: View {
 
     @State private var date = Date.now
     @State private var add = false
+    @State private var library = false
     @Query(sort: \FoodLogEntity.date) private var logs: [FoodLogEntity]
 
     private var dayLogs: [FoodLogEntity] { logs.filter { Calendar.current.isDate($0.date, inSameDayAs: date) } }
@@ -25,13 +26,17 @@ struct FoodView: View {
     var body: some View {
         TabScreen(eyebrow: "Nourishment", title: isToday ? "Today" : date.formatted(.dateTime.weekday(.abbreviated).month(.wide).day()),
                   hidesNavigationBar: !embedded) {
-            HeaderButton(systemImage: "plus", label: "Add food") { add = true }
+            HStack(spacing: 8) {
+                HeaderButton(systemImage: "books.vertical", label: "Food library") { library = true }
+                HeaderButton(systemImage: "plus", label: "Add food") { add = true }
+            }
         } content: {
             dayPicker
             totalsCard
             ForEach(Meal.allCases, id: \.self) { meal in mealCard(meal) }
         }
         .sheet(isPresented: $add) { NavigationStack { AddFoodView(date: logDate) { add = false } } }
+        .sheet(isPresented: $library) { NavigationStack { FoodLibraryView() } }
     }
 
     /// Foods added to a past day are stamped at noon so they sort sensibly.
@@ -136,6 +141,7 @@ struct AddFoodView: View {
     private let service = RemoteNutritionService(proxyURL: Self.configuredProxyURL)
     private var searchAvailable: Bool { Self.configuredProxyURL != nil }
 
+    private var favorites: [FoodEntity] { cached.filter(\.favorite).sorted { $0.name < $1.name } }
     private var recent: [FoodEntity] { Array(cached.filter { $0.lastUsed != nil }.prefix(8)) }
     private var frequent: [FoodEntity] { Array(cached.filter { $0.useCount > 0 }.sorted { $0.useCount > $1.useCount }.prefix(8)) }
     private var library: [FoodEntity] {
@@ -174,15 +180,14 @@ struct AddFoodView: View {
                 }
             }
             if query.isEmpty {
+                if !favorites.isEmpty { Section("Favorites") { ForEach(favorites) { foodRow($0) } } }
                 if !recent.isEmpty { Section("Recent") { ForEach(recent) { foodRow($0) } } }
                 if !frequent.isEmpty { Section("Frequent") { ForEach(frequent) { foodRow($0) } } }
-                if recent.isEmpty && frequent.isEmpty && results.isEmpty {
-                    Section {
-                        Text(searchAvailable
-                             ? "Search for a food, scan a barcode, or create one manually."
-                             : "Scan a barcode or create a food manually. Online search needs the optional nutrition proxy — see the README.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                    }
+                Section {
+                    NavigationLink { StaplesBrowser { selected = $0 } } label: { Label("Browse staples by category", systemImage: "leaf") }
+                    NavigationLink { FoodLibraryView(onPick: { selected = $0 }) } label: { Label("All saved foods", systemImage: "books.vertical") }
+                } footer: {
+                    Text("Type a name to search your saved foods and the built-in staples\(searchAvailable ? ", then press Search for online results" : ""). Packaged products: scan the barcode.")
                 }
             }
         }

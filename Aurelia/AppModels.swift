@@ -62,6 +62,11 @@ import SwiftData
 @Model final class FoodLogEntity {
     var date: Date; var mealRaw: String; var foodName: String; var grams: Double; var calories: Double; var protein: Double; var carbs: Double; var fat: Double
     init(date: Date, meal: Meal, food: FoodEntity, grams: Double) { self.date = date; self.mealRaw = meal.rawValue; self.foodName = food.name; self.grams = grams; let scale = grams / 100; self.calories = food.calories100 * scale; self.protein = food.protein100 * scale; self.carbs = food.carbs100 * scale; self.fat = food.fat100 * scale }
+    /// Restores a log with the macros it was originally saved with.
+    init(date: Date, mealRaw: String, foodName: String, grams: Double, calories: Double, protein: Double, carbs: Double, fat: Double) {
+        self.date = date; self.mealRaw = mealRaw; self.foodName = foodName; self.grams = grams
+        self.calories = calories; self.protein = protein; self.carbs = carbs; self.fat = fat
+    }
 }
 @Model final class SavedMealEntity { var name: String; var itemData: Data; init(name: String, items: [FoodSnapshot]) { self.name = name; self.itemData = (try? JSONEncoder().encode(items)) ?? Data() } }
 @Model final class WaterEntity { var date: Date; var liters: Double; init(date: Date = .now, liters: Double) { self.date = date; self.liters = liters } }
@@ -76,16 +81,3 @@ import SwiftData
     }
 }
 @Model final class PhotoSetEntity { var date: Date; var front: String; var side: String; var back: String; var isDemo: Bool; init(date: Date = .now, front: String, side: String, back: String, isDemo: Bool = false) { self.date = date; self.front = front; self.side = side; self.back = back; self.isDemo = isDemo } }
-
-enum SeedData {
-    static let exercises: [(String, String, [String])] = [
-        ("Hip Thrust", "Glute-focused hip extension.", ["Keep ribs stacked", "Pause at full extension"]),
-        ("Romanian Deadlift", "Hip hinge for hamstrings and glutes.", ["Push hips back", "Keep the bar close"]),
-        ("Leg Press", "Machine compound leg press.", ["Keep hips planted", "Track knees over toes"]),
-        ("Leg Extension", "Machine quadriceps isolation.", ["Move with control"]), ("Hamstring Curl", "Knee-flexion hamstring exercise.", ["Avoid lifting hips"]),
-        ("Hip Abduction", "Machine glute medius exercise.", ["Control the return"]), ("Lat Pulldown", "Vertical back pull.", ["Drive elbows down"]),
-        ("Seated Row", "Horizontal back pull.", ["Keep chest tall"]), ("Shoulder Press", "Overhead pressing movement.", ["Brace your core"]),
-        ("Lateral Raise", "Shoulder isolation.", ["Lead with elbows"]), ("Bicep Curl", "Elbow flexion movement.", ["Keep elbows quiet"]),
-        ("Tricep Pushdown", "Cable triceps movement.", ["Fully extend with control"]), ("Plank", "Isometric trunk exercise.", ["Squeeze glutes", "Breathe steadily"])
-    ]
-}

@@ -68,6 +68,9 @@ enum ExportService {
             },
             photoSets: try all(PhotoSetEntity.self).map {
                 PhotoSetRecord(date: $0.date, front: $0.front, side: $0.side, back: $0.back, isDemo: $0.isDemo)
+            },
+            customExercises: try all(ExerciseEntity.self).filter(\.isCustom).map {
+                CustomExerciseRecord(name: $0.name, summary: $0.summary, tips: $0.tips.components(separatedBy: "\n"))
             })
     }
 

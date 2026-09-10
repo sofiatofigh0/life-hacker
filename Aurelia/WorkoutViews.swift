@@ -244,7 +244,9 @@ struct StrengthSessionView: View {
     }
 }
 
-/// Searchable exercise library. The original bound the search bar to a constant.
+/// The exercise library, grouped by muscle group with an equipment filter.
+/// Muscle group and equipment come from `ExerciseCatalog` by name; the stored
+/// entity only carries name, summary, and tips.
 struct ExercisePicker: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -252,9 +254,40 @@ struct ExercisePicker: View {
     var exclude: Set<String> = []
     let onPick: (String) -> Void
     @State private var search = ""
+    @State private var group: MuscleGroup?
+    @State private var equipment: Equipment?
 
-    private var matches: [ExerciseEntity] {
-        library.filter { !exclude.contains($0.name) && (search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)) }
+    private struct Row: Identifiable {
+        let entity: ExerciseEntity
+        let definition: ExerciseDefinition?
+        var id: String { entity.name }
+        var subtitle: String { definition?.subtitle ?? "Custom" }
+    }
+
+    private var rows: [Row] {
+        let q = search.trimmingCharacters(in: .whitespaces)
+        return library.compactMap { entity -> Row? in
+            guard !exclude.contains(entity.name) else { return nil }
+            let definition = ExerciseCatalog.definition(named: entity.name)
+            if let group, definition?.muscleGroup != group { return nil }
+            if let equipment, definition?.equipment != equipment { return nil }
+            if !q.isEmpty {
+                let haystack = [entity.name, definition?.muscleGroup.label ?? "", definition?.equipment.label ?? ""].joined(separator: " ")
+                guard haystack.localizedCaseInsensitiveContains(q) else { return nil }
+            }
+            return Row(entity: entity, definition: definition)
+        }
+    }
+    /// Grouped in catalog order, customs last.
+    private var sections: [(title: String, rows: [Row])] {
+        var result: [(String, [Row])] = []
+        for g in MuscleGroup.allCases {
+            let inGroup = rows.filter { $0.definition?.muscleGroup == g }
+            if !inGroup.isEmpty { result.append((g.label, inGroup)) }
+        }
+        let customs = rows.filter { $0.definition == nil }
+        if !customs.isEmpty { result.append(("Custom", customs)) }
+        return result
     }
     private var canCreate: Bool {
         let trimmed = search.trimmingCharacters(in: .whitespaces)
@@ -269,20 +302,41 @@ struct ExercisePicker: View {
                         Label("Add “\(search.trimmingCharacters(in: .whitespaces))” as a custom exercise", systemImage: "plus.circle")
                     }
                 }
-                ForEach(matches) { item in
-                    Button {
-                        onPick(item.name)
-                    } label: {
-                        VStack(alignment: .leading) {
-                            Text(item.name)
-                            if !item.summary.isEmpty { Text(item.summary).font(.caption).foregroundStyle(.secondary) }
+                ForEach(sections, id: \.title) { section in
+                    Section(section.title) {
+                        ForEach(section.rows) { row in
+                            Button { onPick(row.entity.name) } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(row.entity.name)
+                                    Text(row.subtitle).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
                         }
                     }
                 }
+                if rows.isEmpty && !canCreate {
+                    ContentUnavailableView.search(text: search)
+                }
             }
-            .searchable(text: $search, prompt: "Search exercises")
+            .searchable(text: $search, prompt: "Search \(library.count) exercises")
             .navigationTitle("Add Exercise")
-            .toolbar { Button("Cancel") { dismiss() } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Picker("Muscle group", selection: $group) {
+                            Text("All muscle groups").tag(MuscleGroup?.none)
+                            ForEach(MuscleGroup.allCases, id: \.self) { Text($0.label).tag(MuscleGroup?.some($0)) }
+                        }
+                        Picker("Equipment", selection: $equipment) {
+                            Text("Any equipment").tag(Equipment?.none)
+                            ForEach(Equipment.allCases, id: \.self) { Text($0.label).tag(Equipment?.some($0)) }
+                        }
+                    } label: {
+                        Label("Filter", systemImage: group == nil && equipment == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    }
+                }
+            }
         }
     }
 
@@ -298,12 +352,21 @@ struct ExerciseDetail: View {
     let name: String
     var body: some View {
         let exercise = exercises.first { $0.name == name }
+        let definition = ExerciseCatalog.definition(named: name)
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 RoundedRectangle(cornerRadius: 24)
                     .fill(Color.sage.opacity(0.15))
                     .frame(height: 180)
                     .overlay { Image(systemName: "figure.strengthtraining.traditional").font(.system(size: 55)).foregroundStyle(.sage) }
+                if let definition {
+                    HStack(spacing: 8) {
+                        Text(definition.muscleGroup.label)
+                        Text("·").foregroundStyle(.secondary)
+                        Text(definition.equipment.label)
+                    }
+                    .font(.caption.weight(.semibold)).textCase(.uppercase).tracking(1).foregroundStyle(.secondary)
+                }
                 Text(exercise?.summary ?? "Custom exercise").font(.title3)
                 Text("Form notes").font(.headline)
                 ForEach((exercise?.tips ?? "Move with control").components(separatedBy: "\n"), id: \.self) { tip in
