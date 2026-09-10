@@ -31,6 +31,7 @@ struct WorkoutHome: View {
     @Query(sort: \TemplateEntity.weekday) private var templates: [TemplateEntity]
     @State private var add = false
     @State private var builder = false
+    @State private var library = false
     @State private var pendingDelete: WorkoutEntity?
 
     private var scheduledToday: TemplateEntity? {
@@ -40,7 +41,10 @@ struct WorkoutHome: View {
 
     var body: some View {
         TabScreen(eyebrow: "Training", title: "Move with intention") {
-            HeaderButton(systemImage: "calendar.badge.clock", label: "Weekly schedule") { builder = true }
+            HStack(spacing: 8) {
+                HeaderButton(systemImage: "books.vertical", label: "Exercise library") { library = true }
+                HeaderButton(systemImage: "calendar.badge.clock", label: "Weekly schedule") { builder = true }
+            }
         } content: {
             Button { add = true } label: {
                 Label("Add Workout", systemImage: "plus").frame(maxWidth: .infinity)
@@ -90,6 +94,7 @@ struct WorkoutHome: View {
         }
         .sheet(isPresented: $add) { AddWorkoutView(date: .now) }
         .sheet(isPresented: $builder) { NavigationStack { TemplateBuilderView() } }
+        .sheet(isPresented: $library) { NavigationStack { ExerciseLibraryView() } }
         .confirmationDialog("Delete this workout?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                             presenting: pendingDelete) { workout in
             Button("Delete \(workout.name)", role: .destructive) { context.delete(workout); try? context.save() }
@@ -241,6 +246,93 @@ struct StrengthSessionView: View {
         workout.exercises.append(SessionExerciseEntity(name: name, order: next, sets: (0..<3).map { SetEntity(order: $0) }))
         try? context.save()
         addExercise = false
+    }
+}
+
+/// Browse the whole exercise library: grouped by muscle group, filterable by
+/// equipment, searchable, with form notes a tap away. Custom exercises can be
+/// added and deleted here; built-in ones cannot be deleted.
+struct ExerciseLibraryView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Query(sort: \ExerciseEntity.name) private var library: [ExerciseEntity]
+    @State private var search = ""
+    @State private var group: MuscleGroup?
+    @State private var equipment: Equipment?
+
+    private var matches: [ExerciseEntity] {
+        let q = search.trimmingCharacters(in: .whitespaces)
+        return library.filter { entity in
+            let definition = ExerciseCatalog.definition(named: entity.name)
+            if let group, definition?.muscleGroup != group { return false }
+            if let equipment, definition?.equipment != equipment { return false }
+            guard !q.isEmpty else { return true }
+            let haystack = [entity.name, definition?.muscleGroup.label ?? "Custom", definition?.equipment.label ?? ""].joined(separator: " ")
+            return haystack.localizedCaseInsensitiveContains(q)
+        }
+    }
+    private var sections: [(title: String, rows: [ExerciseEntity])] {
+        var result: [(String, [ExerciseEntity])] = []
+        for g in MuscleGroup.allCases {
+            let inGroup = matches.filter { ExerciseCatalog.definition(named: $0.name)?.muscleGroup == g }
+            if !inGroup.isEmpty { result.append(("\(g.label) · \(inGroup.count)", inGroup)) }
+        }
+        let customs = matches.filter { ExerciseCatalog.definition(named: $0.name) == nil }
+        if !customs.isEmpty { result.append(("Custom · \(customs.count)", customs)) }
+        return result
+    }
+    private var canCreate: Bool {
+        let trimmed = search.trimmingCharacters(in: .whitespaces)
+        return !trimmed.isEmpty && !library.contains { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame }
+    }
+
+    var body: some View {
+        List {
+            if canCreate {
+                Button {
+                    context.insert(ExerciseEntity(search.trimmingCharacters(in: .whitespaces), summary: "Custom exercise", tips: ["Move with control"], isCustom: true))
+                    try? context.save(); search = ""
+                } label: { Label("Add “\(search.trimmingCharacters(in: .whitespaces))” as a custom exercise", systemImage: "plus.circle") }
+            }
+            ForEach(sections, id: \.title) { section in
+                Section(section.title) {
+                    ForEach(section.rows) { entity in
+                        NavigationLink { ExerciseDetail(name: entity.name) } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(entity.name)
+                                Text(ExerciseCatalog.definition(named: entity.name)?.subtitle ?? "Custom").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .swipeActions(edge: .trailing) {
+                            if entity.isCustom {
+                                Button(role: .destructive) { context.delete(entity); try? context.save() } label: { Label("Delete", systemImage: "trash") }
+                            }
+                        }
+                    }
+                }
+            }
+            if matches.isEmpty && !canCreate { ContentUnavailableView.search(text: search) }
+        }
+        .searchable(text: $search, prompt: "Search \(library.count) exercises")
+        .navigationTitle("Exercise Library")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Picker("Muscle group", selection: $group) {
+                        Text("All muscle groups").tag(MuscleGroup?.none)
+                        ForEach(MuscleGroup.allCases, id: \.self) { Text($0.label).tag(MuscleGroup?.some($0)) }
+                    }
+                    Picker("Equipment", selection: $equipment) {
+                        Text("Any equipment").tag(Equipment?.none)
+                        ForEach(Equipment.allCases, id: \.self) { Text($0.label).tag(Equipment?.some($0)) }
+                    }
+                } label: {
+                    Label("Filter", systemImage: group == nil && equipment == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                }
+            }
+        }
     }
 }
 
