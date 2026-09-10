@@ -43,10 +43,14 @@ enum DemoData {
 
             // Activity: a rest-day / training-day rhythm with noise.
             let trained = [2, 4, 6].contains(weekday)
-            let steps = Double((trained ? 9_800 : 6_900) + Int(rng.next() % 2_400))
-            let active = Double((trained ? 420 : 260) + Int(rng.next() % 120))
-            context.insert(ActivityEntity(date: day, steps: steps, activeCalories: active,
-                                          basalCalories: 1_420 + Double(rng.next() % 60), averageHeartRate: 66 + Double(rng.next() % 9)))
+            let baseSteps: Int = trained ? 9_800 : 6_900
+            let stepNoise: Int = Int(rng.next() % 2_400)
+            let baseActive: Int = trained ? 420 : 260
+            let activeNoise: Int = Int(rng.next() % 120)
+            let basal: Double = 1_420 + Double(rng.next() % 60)
+            let heartRate: Double = 66 + Double(rng.next() % 9)
+            context.insert(ActivityEntity(date: day, steps: Double(baseSteps + stepNoise), activeCalories: Double(baseActive + activeNoise),
+                                          basalCalories: basal, averageHeartRate: heartRate))
 
             // Water: three or four quick-adds.
             for _ in 0..<(3 + Int(rng.next() % 2)) {
@@ -55,36 +59,48 @@ enum DemoData {
 
             // Weight: gentle downward trend with daily noise, logged most mornings.
             if rng.next() % 5 != 0 {
-                let kg = 70.4 + Double(offset) * 0.06 + (Double(rng.next() % 60) - 30) / 100
-                context.insert(WeightEntity(date: calendar.date(byAdding: .hour, value: 7, to: day)!, kilograms: (kg * 10).rounded() / 10))
+                let trend: Double = Double(offset) * 0.06
+                let noise: Double = (Double(rng.next() % 60) - 30) / 100
+                let kg: Double = 70.4 + trend + noise
+                let rounded: Double = (kg * 10).rounded() / 10
+                context.insert(WeightEntity(date: calendar.date(byAdding: .hour, value: 7, to: day)!, kilograms: rounded))
             }
 
             // Workouts on training days.
             if trained {
                 let template = weekday == 2 ? lower : (weekday == 4 ? upper : lowerB)
-                let exercises = template.exerciseNames.enumerated().map { index, name in
-                    SessionExerciseEntity(name: name, order: index, sets: (0..<3).map { setIndex in
-                        let base = name == "Hip Thrust" ? 70.0 : (name.contains("Press") ? 60.0 : 25.0)
-                        let progress = Double(35 + offset) * 0.25
-                        return SetEntity(order: setIndex, weightKG: ((base + progress) * 2).rounded() / 2, reps: 8 + Int(rng.next() % 4))
-                    })
+                var exercises: [SessionExerciseEntity] = []
+                for (index, name) in template.exerciseNames.enumerated() {
+                    let base: Double = name == "Hip Thrust" ? 70.0 : (name.contains("Press") ? 60.0 : 25.0)
+                    let progress: Double = Double(35 + offset) * 0.25
+                    let weight: Double = ((base + progress) * 2).rounded() / 2
+                    var sets: [SetEntity] = []
+                    for setIndex in 0..<3 {
+                        let reps: Int = 8 + Int(rng.next() % 4)
+                        sets.append(SetEntity(order: setIndex, weightKG: weight, reps: reps))
+                    }
+                    exercises.append(SessionExerciseEntity(name: name, order: index, sets: sets))
                 }
+                let duration: Double = 48 + Double(rng.next() % 15)
                 let workout = WorkoutEntity(date: calendar.date(byAdding: .hour, value: 18, to: day)!, name: template.name,
-                                            completed: true, durationMinutes: 48 + Double(rng.next() % 15), exercises: exercises)
+                                            completed: true, durationMinutes: duration, exercises: exercises)
                 context.insert(workout)
             } else if weekday == 1 {
+                let walkMinutes: Double = 40 + Double(rng.next() % 20)
                 let walk = WorkoutEntity(date: calendar.date(byAdding: .hour, value: 9, to: day)!, name: "Outdoor Walking",
-                                         completed: true, isCardio: true, durationMinutes: 40 + Double(rng.next() % 20))
-                walk.distanceKM = 4 + Double(rng.next() % 20) / 10
+                                         completed: true, isCardio: true, durationMinutes: walkMinutes)
+                let tenthsKM: Double = Double(rng.next() % 20) / 10
+                walk.distanceKM = 4 + tenthsKM
                 context.insert(walk)
             }
 
             // Food: most meals most days, a little variety in amounts.
             for (food, meal, grams) in foods where rng.next() % 6 != 0 {
-                let jitter = 0.85 + Double(rng.next() % 30) / 100
-                let mealHour = [Meal.breakfast: 8, .lunch: 12, .dinner: 19, .snacks: 15][meal] ?? 12
+                let jitter: Double = 0.85 + Double(rng.next() % 30) / 100
+                let portion: Double = (grams * jitter).rounded()
+                let mealHour: Int = [Meal.breakfast: 8, .lunch: 12, .dinner: 19, .snacks: 15][meal] ?? 12
                 context.insert(FoodLogEntity(date: calendar.date(byAdding: .hour, value: mealHour, to: day)!,
-                                             meal: meal, food: food, grams: (grams * jitter).rounded()))
+                                             meal: meal, food: food, grams: portion))
                 food.useCount += 1
                 food.lastUsed = day
             }

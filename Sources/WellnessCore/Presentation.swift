@@ -101,13 +101,44 @@ public enum LegacyDemoFixtures {
     public static let workoutExercise = "Hip Thrust"
     public static let workoutReps = 10
 
+    // The seeder's formulas, one per line with explicit types. Folding these into
+    // `map` closures made Xcode's type checker time out ("unable to type-check
+    // this expression in reasonable time").
+    static func fixtureSteps(offset: Int) -> Double {
+        let scaled: Int = abs(offset * 379) % 6000
+        return Double(7000 + scaled)
+    }
+    static func fixtureActiveCalories(offset: Int) -> Double {
+        let scaled: Int = abs(offset * 31) % 350
+        return Double(250 + scaled)
+    }
+    static func fixtureWaterLiters(offset: Int) -> Double {
+        let tenths: Int = 14 + abs(offset) % 8
+        return Double(tenths) / 10.0
+    }
+    static func fixtureWeightKG(offset: Int) -> Double {
+        let drift: Double = Double(offset) * 0.035
+        return 70.0 + drift
+    }
+
     /// (steps, activeCalories) for each of the 36 seeded days.
-    public static let activityPairs: Set<ActivityPair> = Set((-35...0).map { offset in
-        ActivityPair(steps: Double(7000 + abs(offset * 379) % 6000),
-                     activeCalories: Double(250 + abs(offset * 31) % 350))
-    })
-    public static let waterLiters: Set<Double> = Set((-35...0).map { Double(14 + abs($0) % 8) / 10 })
-    public static let weightsKG: [Double] = (-35...0).map { 70 + Double($0) * 0.035 }
+    public static let activityPairs: Set<ActivityPair> = {
+        var pairs = Set<ActivityPair>()
+        for offset in -35...0 {
+            pairs.insert(ActivityPair(steps: fixtureSteps(offset: offset), activeCalories: fixtureActiveCalories(offset: offset)))
+        }
+        return pairs
+    }()
+    public static let waterLiters: Set<Double> = {
+        var liters = Set<Double>()
+        for offset in -35...0 { liters.insert(fixtureWaterLiters(offset: offset)) }
+        return liters
+    }()
+    public static let weightsKG: [Double] = {
+        var weights: [Double] = []
+        for offset in -35...0 { weights.append(fixtureWeightKG(offset: offset)) }
+        return weights
+    }()
 
     public struct ActivityPair: Hashable, Sendable {
         public let steps: Double
