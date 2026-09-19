@@ -33,6 +33,7 @@
 		A1B2C3D0000000000000A10E /* RestTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B10E /* RestTimer.swift */; };
 		A1B2C3D0000000000000A10F /* FoodTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B10F /* FoodTools.swift */; };
 		A1B2C3D0000000000000A110 /* Insights.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B110 /* Insights.swift */; };
+		A1B2C3D0000000000000A111 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B111 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +79,8 @@
 		A1B2C3D0000000000000B10E /* RestTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimer.swift; sourceTree = "<group>"; };
 		A1B2C3D0000000000000B10F /* FoodTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodTools.swift; sourceTree = "<group>"; };
 		A1B2C3D0000000000000B110 /* Insights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Insights.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B111 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B112 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +136,7 @@
 				A1B2C3D000000000000000B7 /* Assets.xcassets */,
 				A1B2C3D000000000000000B9 /* Info.plist */,
 				A1B2C3D000000000000000BA /* Aurelia.entitlements */,
+				A1B2C3D0000000000000B111 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Aurelia;
 			sourceTree = "<group>";
@@ -163,6 +167,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D000000000000000BB /* Base.xcconfig */,
+				A1B2C3D0000000000000B112 /* Version.xcconfig */,
 				A1B2C3D000000000000000BC /* Secrets.xcconfig.example */,
 			);
 			path = Config;
@@ -259,6 +264,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D000000000000000A7 /* Assets.xcassets in Resources */,
+				A1B2C3D0000000000000A111 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -380,7 +386,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Aurelia/Aurelia.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Aurelia/Info.plist;
@@ -388,7 +393,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -406,7 +410,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Aurelia/Aurelia.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Aurelia/Info.plist;
@@ -414,7 +417,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -430,9 +432,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.AureliaTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = 1;
@@ -446,9 +446,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.AureliaTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = 1;

@@ -69,6 +69,12 @@ Your logs live in one SwiftData database inside the app's container. They surviv
 Your safety net is Settings → **Export all data (JSON)**. Do it before any update that mentions a schema
 change, and occasionally otherwise. **Restore from a backup** puts a file back (replace, not merge).
 
+## Sharing it with someone else
+
+[`TESTFLIGHT.md`](TESTFLIGHT.md) walks through Apple's beta channel: one-time App Store Connect setup, then
+`./release.sh` to bump the build number, archive, and upload. Testers install from the TestFlight app with
+no Mac involved. Version and build numbers live in `Config/Version.xcconfig`.
+
 ## Requirements
 
 - **A Mac.** This is a native SwiftUI/SwiftData/HealthKit app. There is no way to install it on an iPhone

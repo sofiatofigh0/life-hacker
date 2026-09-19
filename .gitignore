@@ -7,3 +7,5 @@ Config/Secrets.xcconfig
 supabase/.temp/
 # Xcode regenerates this on every open; nothing in it is source.
 *.xcodeproj/project.xcworkspace/
+# Archives and exports from release.sh
+build/
