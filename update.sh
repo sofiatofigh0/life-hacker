@@ -8,12 +8,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-if ! git diff --quiet -- Aurelia.xcodeproj/project.pbxproj; then
-  echo "Xcode changed project.pbxproj; discarding these lines:"
-  git diff -- Aurelia.xcodeproj/project.pbxproj | grep '^[-+]' | grep -v '^[-+][-+]' | sed 's/^/    /' | head -20
-  git checkout -- Aurelia.xcodeproj/project.pbxproj
-  echo
-fi
+# Files Xcode rewrites on its own. Edits to them are made here, in git, never
+# by hand on the Mac, so local changes are always Xcode's and safe to drop.
+for f in Aurelia.xcodeproj/project.pbxproj Aurelia/Info.plist; do
+  if ! git diff --quiet -- "$f"; then
+    echo "Xcode changed $f; discarding these lines:"
+    git diff -- "$f" | grep '^[-+]' | grep -v '^[-+][-+]' | sed 's/^/    /' | head -20
+    git checkout -- "$f"
+    echo
+  fi
+done
 
 git pull --ff-only
 echo
