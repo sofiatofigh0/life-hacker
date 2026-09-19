@@ -170,7 +170,7 @@ enum Persistence {
                                       carbs100: staple.per100.carbs, fat100: staple.per100.fat, servingGrams: staple.servingGrams))
             changed = true
         }
-        if changed { try? context.save() }
+        if changed { context.commit() }
     }
 
     /// Brings the stored exercise library up to date with `ExerciseCatalog`.
@@ -201,6 +201,6 @@ enum Persistence {
                 changed = true
             }
         }
-        if changed { try? context.save() }
+        if changed { context.commit() }
     }
 }

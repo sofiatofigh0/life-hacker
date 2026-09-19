@@ -72,7 +72,7 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .toolbar { Button("Done") { try? context.save(); dismiss() } }
+        .toolbar { Button("Done") { context.commit(); dismiss() } }
         .sheet(item: $exportFile) { file in ShareSheet(url: file.url) }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
             switch result {
@@ -135,6 +135,7 @@ struct SettingsView: View {
                 profile.calorieTarget = r.calories
                 profile.proteinTarget = r.proteinGrams
                 Haptics.success()
+                ToastCenter.shared.show("Targets updated: \(r.calories.formatted()) kcal · \(r.proteinGrams) g protein")
             }
         } header: { Text("Daily targets") } footer: {
             Text("Recalculate uses your current weight, height, age, activity, and goal. Activity never adds calories back.")
@@ -167,13 +168,13 @@ struct SettingsView: View {
             ForEach(supplements) { Text($0.name) }
                 .onDelete { offsets in
                     offsets.map { supplements[$0] }.forEach(context.delete)
-                    try? context.save()
+                    context.commit()
                 }
                 .onMove { from, to in
                     var reordered = supplements
                     reordered.move(fromOffsets: from, toOffset: to)
                     for (index, supplement) in reordered.enumerated() { supplement.order = index }
-                    try? context.save()
+                    context.commit()
                 }
             HStack {
                 TextField("Add supplement", text: $newSupplement)
@@ -181,7 +182,7 @@ struct SettingsView: View {
                     let name = newSupplement.trimmingCharacters(in: .whitespaces)
                     guard !name.isEmpty else { return }
                     context.insert(SupplementEntity(name: name, order: (supplements.map(\.order).max() ?? -1) + 1))
-                    try? context.save()
+                    context.commit()
                     newSupplement = ""
                 }
                 .disabled(newSupplement.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -368,6 +369,7 @@ struct SettingsView: View {
             let result = try ExportService.writeFile(context: context)
             exportFile = ExportFile(url: result.url, records: result.records)
             Haptics.success()
+            ToastCenter.shared.show("Export ready · \(result.records.formatted()) records")
         } catch {
             exportError = "Export failed: \(error.localizedDescription)"
         }
@@ -393,6 +395,7 @@ struct SettingsView: View {
             let report = try DemoCleanup.remove(context: context)
             cleanupResult = report.total == 0 ? "Nothing to remove." : "Removed \(report.summary)."
             Haptics.success()
+            ToastCenter.shared.show(cleanupResult ?? "Done")
         } catch {
             cleanupResult = "Could not remove demo data: \(error.localizedDescription)"
         }

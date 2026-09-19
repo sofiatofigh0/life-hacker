@@ -45,8 +45,9 @@ struct QuickAddView: View {
                         let label = name.trimmingCharacters(in: .whitespaces)
                         context.insert(FoodLogEntity(date: date, mealRaw: meal.rawValue, foodName: label.isEmpty ? "Quick add" : label,
                                                      grams: 0, calories: calories ?? 0, protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0))
-                        try? context.save()
+                        context.commit()
                         Haptics.success()
+                        ToastCenter.shared.show("Added \(Int(calories ?? 0)) kcal to \(meal.label)")
                         onDone()
                     }
                     .disabled((calories ?? 0) <= 0 && (protein ?? 0) <= 0)
@@ -114,16 +115,36 @@ struct FoodEntryEditor: View {
                             entry.fat = original.fat * scale
                         }
                         entry.mealRaw = meal.rawValue
-                        try? context.save()
+                        context.commit()
                         Haptics.success()
+                        ToastCenter.shared.show("Entry updated")
                         dismiss()
                     }
                     .disabled(!isQuickAdd && (grams ?? 0) <= 0)
                 }
             }
             .confirmationDialog("Remove this entry?", isPresented: $confirmDelete) {
-                Button("Remove", role: .destructive) { context.delete(entry); try? context.save(); dismiss() }
+                Button("Remove", role: .destructive) { FoodLogActions.remove(entry, context: context); dismiss() }
             }
+        }
+    }
+}
+
+// MARK: - Removing entries
+
+enum FoodLogActions {
+    /// Deletes an entry and offers Undo, which re-inserts an identical row.
+    /// A confirmation dialog for a one-line removal would be friction; undo is the right recovery.
+    @MainActor
+    static func remove(_ entry: FoodLogEntity, context: ModelContext) {
+        let copy = (date: entry.date, meal: entry.mealRaw, name: entry.foodName, grams: entry.grams,
+                    calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat)
+        context.delete(entry)
+        context.commit()
+        ToastCenter.shared.show("Removed \(copy.name)", style: .info, actionTitle: "Undo") {
+            context.insert(FoodLogEntity(date: copy.date, mealRaw: copy.meal, foodName: copy.name, grams: copy.grams,
+                                         calories: copy.calories, protein: copy.protein, carbs: copy.carbs, fat: copy.fat))
+            context.commit()
         }
     }
 }
@@ -158,7 +179,7 @@ enum SavedMeals {
             context.insert(FoodLogEntity(date: date, mealRaw: meal.rawValue, foodName: item.name, grams: grams,
                                          calories: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat))
         }
-        try? context.save()
+        context.commit()
     }
 
     /// Copies one day's entries onto another, preserving meal and time of day.
@@ -171,7 +192,7 @@ enum SavedMeals {
             context.insert(FoodLogEntity(date: stamp, mealRaw: entry.mealRaw, foodName: entry.foodName, grams: entry.grams,
                                          calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat))
         }
-        try? context.save()
+        context.commit()
     }
 }
 
@@ -190,6 +211,7 @@ struct SavedMealsSection: View {
                     Button {
                         SavedMeals.log(meal, into: Meal.inferred(hour: Calendar.current.component(.hour, from: date)), on: date, context: context)
                         Haptics.success()
+                        ToastCenter.shared.show("Logged \(meal.name) · \(Int(totals.calories)) kcal")
                         onLogged()
                     } label: {
                         HStack {
@@ -203,7 +225,7 @@ struct SavedMealsSection: View {
                         }
                     }
                 }
-                .onDelete { offsets in offsets.map { saved[$0] }.forEach(context.delete); try? context.save() }
+                .onDelete { offsets in offsets.map { saved[$0] }.forEach(context.delete); context.commit() }
             }
         }
     }

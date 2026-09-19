@@ -255,8 +255,9 @@ struct WeightEntryView: View {
         }
         // The profile's current weight drives the goal card; keep it at the latest entry.
         if weights.first.map({ stamp >= $0.date }) ?? true { profile.currentKG = kg }
-        try? context.save()
+        context.commit()
         Haptics.success()
+        ToastCenter.shared.show(existing == nil ? "Weight saved" : "Weight updated")
         // Best-effort write to Apple Health; never blocks the log.
         Task { try? await HealthKitService.shared.saveBodyMass(kilograms: kg, date: stamp) }
         dismiss()
@@ -309,7 +310,7 @@ struct PhotoSetsView: View {
             Button("Delete photos from \(set.date.formatted(date: .abbreviated, time: .omitted))", role: .destructive) {
                 ProgressPhotoStore.deleteFiles(of: set)
                 context.delete(set)
-                try? context.save()
+                context.commit()
             }
         } message: { _ in Text("The three image files are removed from the app's storage as well.") }
     }
@@ -366,7 +367,9 @@ struct PhotoCaptureFlow: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         context.insert(PhotoSetEntity(front: filenames[0], side: filenames[1], back: filenames[2]))
-                        try? context.save()
+                        context.commit()
+                        Haptics.success()
+                        ToastCenter.shared.show("Photos saved")
                         dismiss()
                     }
                     .disabled(filenames.contains(""))
@@ -377,10 +380,18 @@ struct PhotoCaptureFlow: View {
 
     private func save(_ item: PhotosPickerItem?, index: Int) {
         Task {
-            guard let data = try? await item?.loadTransferable(type: Data.self) else { return }
-            let url = ProgressPhotoStore.url(for: "progress-\(UUID().uuidString).jpg")
-            try? data.write(to: url, options: .atomic)
-            filenames[index] = url.lastPathComponent
+            guard let item else { return }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    ToastCenter.shared.show("That photo couldn't be read. Try another one.", style: .error); return
+                }
+                let url = ProgressPhotoStore.url(for: "progress-\(UUID().uuidString).jpg")
+                try data.write(to: url, options: .atomic)
+                filenames[index] = url.lastPathComponent
+            } catch {
+                Log.files.error("photo import failed: \(error.localizedDescription, privacy: .public)")
+                ToastCenter.shared.show("That photo couldn't be saved. Try another one.", style: .error)
+            }
         }
     }
 }

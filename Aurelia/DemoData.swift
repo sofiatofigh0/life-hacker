@@ -112,7 +112,7 @@ enum DemoData {
             }
         }
 
-        try? context.save()
+        context.commit()
     }
 
     /// Deterministic so the demo looks the same every launch.

@@ -30,6 +30,20 @@ struct OnboardingView: View {
 
     private let titles = ["Wellness, considered.", "Your foundations", "A gentle direction"]
 
+    /// Targets are computed from these, so they must be real numbers before moving on.
+    private var canContinue: Bool {
+        switch page {
+        case 1: return heightCM > 0 && currentKG > 0 && goalKG > 0
+        case 2: return calories >= 800 && protein > 0 && steps > 0 && waterLiters > 0
+        default: return true
+        }
+    }
+    private var continueHint: String? {
+        guard !canContinue else { return nil }
+        return page == 1 ? "Enter your height, current weight, and goal weight to continue."
+                         : "Calories (at least 800), protein, steps, and water all need a value."
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -51,6 +65,10 @@ struct OnboardingView: View {
                             if page < 2 { page += 1; if page == 2 { recommend() } } else { finish() }
                         }
                         .buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth: .infinity)
+                        .disabled(!canContinue)
+                    }
+                    if let hint = continueHint {
+                        Text(hint).font(.footnote).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(24)
@@ -170,8 +188,7 @@ struct OnboardingView: View {
                                  stepTarget: steps, waterTargetLiters: waterLiters, onboarded: true)
         context.insert(profile)
         context.insert(WeightEntity(date: .now, kilograms: currentKG))
-        context.insert(SupplementEntity(name: "Creatine", order: 0))
-        context.insert(SupplementEntity(name: "Multivitamin", order: 1))
-        try? context.save()
+        context.commit()
+        Haptics.success()
     }
 }

@@ -108,6 +108,7 @@ struct RootView: View {
             }
         }
         .tint(.sage)
+        .overlay(alignment: .bottom) { ToastHost().padding(.bottom, 64) }
         .task { await syncHealthIfAppropriate() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await syncHealthIfAppropriate() } }
@@ -227,7 +228,7 @@ struct EditorialTitle: View {
     let eyebrow: String
     let title: String
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             Text(eyebrow.uppercased()).font(.caption.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
             Text(title).font(.system(.largeTitle, design: .serif, weight: .medium))
         }
@@ -239,11 +240,11 @@ struct WellnessCard<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
         content
-            .padding(18)
+            .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.background)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(color: .black.opacity(0.05), radius: 14, y: 5)
+            .background(.background, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card).stroke(Theme.hairline))
+            .shadow(color: Theme.Shadow.cardColor, radius: Theme.Shadow.cardRadius, y: Theme.Shadow.cardY)
     }
 }
 
@@ -259,11 +260,11 @@ struct TabScreen<Trailing: View, Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            LazyVStack(spacing: Theme.Spacing.lg) {
                 HStack(alignment: .top) { EditorialTitle(eyebrow: eyebrow, title: title); trailing }
                 content
             }
-            .padding(18)
+            .padding(Theme.Spacing.lg)
         }
         .background(Color.cream.opacity(0.45))
         .navigationTitle(title)
@@ -289,7 +290,8 @@ struct HeaderButton: View {
                 .font(.title3)
                 .frame(width: 44, height: 44)
                 .background(.background, in: Circle())
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+                .overlay(Circle().stroke(Theme.hairline))
+                .shadow(color: Theme.Shadow.cardColor, radius: Theme.Shadow.cardRadius, y: Theme.Shadow.cardY)
         }
         .accessibilityLabel(label)
     }

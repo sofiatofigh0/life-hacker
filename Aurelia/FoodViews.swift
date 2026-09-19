@@ -41,16 +41,15 @@ struct FoodView: View {
         } content: {
             dayPicker
             totalsCard
-            if dayLogs.isEmpty && !yesterdayLogs.isEmpty {
-                Button {
-                    SavedMeals.copy(entries: yesterdayLogs, to: date, context: context)
-                    Haptics.success()
-                } label: {
-                    Label("Copy yesterday's \(yesterdayLogs.count) entries", systemImage: "doc.on.doc").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            if dayLogs.isEmpty {
+                EmptyStateCard(icon: "leaf",
+                               title: isToday ? "Nothing logged yet" : "Nothing logged this day",
+                               message: "Add what you ate and the totals above fill in. Barcode, search, staples, or a quick calorie entry all work.",
+                               primary: (title: "Add food", action: { add = true }),
+                               secondary: yesterdayLogs.isEmpty ? nil : (title: "Copy yesterday", action: copyYesterday))
+            } else {
+                ForEach(Meal.allCases, id: \.self) { meal in mealCard(meal) }
             }
-            ForEach(Meal.allCases, id: \.self) { meal in mealCard(meal) }
         }
         .sheet(isPresented: $add) { NavigationStack { AddFoodView(date: logDate) { add = false } } }
         .sheet(isPresented: $library) { NavigationStack { FoodLibraryView() } }
@@ -164,8 +163,8 @@ struct FoodView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            // A ScrollView has no swipe actions; the original's delete was unreachable.
-            Button { context.delete(entry); try? context.save() } label: {
+            // A ScrollView has no swipe actions, so removal is a button — with Undo.
+            Button { FoodLogActions.remove(entry, context: context) } label: {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
@@ -173,14 +172,22 @@ struct FoodView: View {
         }
     }
 
+    private func copyYesterday() {
+        SavedMeals.copy(entries: yesterdayLogs, to: date, context: context)
+        Haptics.success()
+        ToastCenter.shared.show("Copied \(yesterdayLogs.count) entries from yesterday")
+    }
+
     private func saveMeal(_ meal: Meal) {
         let name = mealName.trimmingCharacters(in: .whitespaces)
         let entries = dayLogs.filter { $0.mealRaw == meal.rawValue }
         let items = entries.compactMap(SavedMeals.snapshot(from:))
         guard !items.isEmpty else { return }
-        context.insert(SavedMealEntity(name: name.isEmpty ? "\(meal.label) · \(date.formatted(date: .abbreviated, time: .omitted))" : name, items: items))
-        try? context.save()
+        let finalName = name.isEmpty ? "\(meal.label) · \(date.formatted(date: .abbreviated, time: .omitted))" : name
+        context.insert(SavedMealEntity(name: finalName, items: items))
+        context.commit()
         Haptics.success()
+        ToastCenter.shared.show("Saved “\(finalName)” · find it in Add Food")
     }
 }
 
@@ -292,7 +299,7 @@ struct AddFoodView: View {
                                 carbs100: snapshot.nutrientsPer100Grams.carbs, fat100: snapshot.nutrientsPer100Grams.fat,
                                 servingGrams: snapshot.servingGrams ?? 100)
         context.insert(entity)
-        try? context.save()
+        context.commit()
         return entity
     }
 
@@ -401,11 +408,13 @@ struct FoodAmountView: View {
     }
 
     private func log() {
-        context.insert(FoodLogEntity(date: date, meal: meal, food: food, grams: grams ?? 0))
+        let entry = FoodLogEntity(date: date, meal: meal, food: food, grams: grams ?? 0)
+        context.insert(entry)
         food.useCount += 1
         food.lastUsed = .now
-        try? context.save()
+        context.commit()
         Haptics.success()
+        ToastCenter.shared.show("Added \(food.name) · \(Int(entry.calories)) kcal")
     }
 }
 
@@ -462,7 +471,7 @@ struct ManualFoodView: View {
                                                 barcode: barcode, calories100: calories ?? 0, protein100: protein ?? 0,
                                                 carbs100: carbs ?? 0, fat100: fat ?? 0, servingGrams: serving ?? 100)
                         context.insert(entity)
-                        try? context.save()
+                        context.commit()
                         Haptics.success()
                         onSaved(entity)
                     }

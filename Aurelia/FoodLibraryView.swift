@@ -66,12 +66,16 @@ struct FoodLibraryView: View {
                         }
                     }
                     .swipeActions(edge: .leading) {
-                        Button { food.favorite.toggle(); try? context.save(); Haptics.tap() } label: {
+                        Button { food.favorite.toggle(); context.commit(); Haptics.tap() } label: {
                             Label(food.favorite ? "Unfavorite" : "Favorite", systemImage: food.favorite ? "star.slash" : "star")
                         }.tint(.yellow)
                     }
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) { context.delete(food); try? context.save() } label: { Label("Delete", systemImage: "trash") }
+                        Button(role: .destructive) {
+                            let name = food.name
+                            context.delete(food); context.commit()
+                            ToastCenter.shared.show("Deleted \(name)", style: .info)
+                        } label: { Label("Delete", systemImage: "trash") }
                         Button { editing = food } label: { Label("Edit", systemImage: "pencil") }.tint(.sage)
                     }
                 }
@@ -144,9 +148,9 @@ struct FoodEditorView: View {
             }
             .navigationTitle("Edit Food")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { try? context.save(); dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { context.commit(); dismiss() } } }
             .confirmationDialog("Delete this food?", isPresented: $confirmDelete) {
-                Button("Delete", role: .destructive) { context.delete(food); try? context.save(); dismiss() }
+                Button("Delete", role: .destructive) { context.delete(food); context.commit(); dismiss() }
             } message: { Text("Meals already logged with it are kept.") }
         }
     }

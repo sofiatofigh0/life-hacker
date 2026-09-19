@@ -13,6 +13,18 @@ and includes the first real schema migration (V1 → V2).
 
 ---
 
+## Added in the polish pass
+
+| # | Item |
+|---|---|
+| Q1 | **Design tokens** (`Theme` in `DesignSystem.swift`): spacing, radii, hairline, shadow. Cards and header buttons use a hairline edge and a softer shadow; tab roots render lazily. Launch screen matches the cream ground. |
+| Q2 | **Every save reports failure.** `ModelContext.commit()` replaces 56 silent `try? save()` calls; a failed save logs (os.Logger) and shows a toast. |
+| Q3 | **Toasts** confirm the actions that matter: food logged (with kcal), saved meal, copy yesterday, entry updated, workout saved (duration, volume), cardio saved, weight saved, photos saved, export ready, targets recalculated, program day added, food deleted. |
+| Q4 | **Undo instead of a dialog** for removing a logged food (Food tab, day detail, entry editor). |
+| Q5 | **Empty states** with a way in: Food (empty day: Add food / Copy yesterday), Workout (no sessions: Set up schedule). One `EmptyStateCard` component. |
+| Q6 | **Onboarding validation**: Continue is disabled until height and both weights are entered, and until calories (≥ 800), protein, steps and water have values, with a hint explaining why. No supplements are pre-filled. |
+| Q7 | Photo import errors are reported instead of swallowed. |
+
 ## Added after the product-review pass
 
 | # | Item |

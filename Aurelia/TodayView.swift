@@ -188,7 +188,7 @@ struct TodayView: View {
                     ForEach(profile.units.waterQuickAdds, id: \.self) { amount in
                         Button(profile.units.waterQuickAddLabel(liters: amount)) {
                             context.insert(WaterEntity(liters: amount))
-                            try? context.save()
+                            context.commit()
                             Haptics.tap()
                         }
                         .buttonStyle(.bordered)
@@ -237,20 +237,20 @@ struct TodayView: View {
         } else {
             context.insert(SupplementCheckEntity(name: name))
         }
-        try? context.save()
+        context.commit()
         Haptics.tap()
     }
 
     private func undoLastWater() {
         guard let last = waters.filter({ isToday($0.date) }).max(by: { $0.date < $1.date }) else { return }
         context.delete(last)
-        try? context.save()
+        context.commit()
     }
 
     private func start(_ template: TemplateEntity) {
         let workout = WorkoutEntity.make(from: template, date: .now)
         context.insert(workout)
-        try? context.save()
+        context.commit()
         Haptics.success()
         startedWorkout = workout
     }

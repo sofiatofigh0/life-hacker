@@ -187,7 +187,7 @@ struct DayDetailView: View {
                         }
                     }
                 }
-                .onDelete { offsets in offsets.map { dayLogs[$0] }.forEach(context.delete); try? context.save() }
+                .onDelete { offsets in offsets.map { dayLogs[$0] }.forEach { FoodLogActions.remove($0, context: context) } }
                 if !dayLogs.isEmpty {
                     LabeledContent("Total", value: "\(Int(dayLogs.map(\.calories).reduce(0, +)).formatted()) kcal · \(Int(dayLogs.map(\.protein).reduce(0, +))) g protein")
                         .font(.subheadline)

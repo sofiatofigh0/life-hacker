@@ -44,6 +44,8 @@ change so far. **This build migrates the data store to schema V3 on first launch
   last 14 days on launch, on return to the foreground, and on demand. Weights logged in the app are written
   to Health; weights recorded elsewhere (a scale) are imported for days with no manual entry.
 - Full unit awareness: every field and display follows the profile's imperial/metric choice.
+- One design system (`Aurelia/DesignSystem.swift`): tokens, cards, empty states, and toasts. Every action that
+  matters confirms itself, every failed save says so, and removing a food entry offers Undo.
 - **Demo mode** runs against a separate in-memory store with a generated five-week history. Your own
   records are never modified by it. Settings can also scan for — and remove — fixtures that an earlier
   build's demo mode wrote into the real database.

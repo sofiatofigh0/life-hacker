@@ -109,13 +109,10 @@ struct WorkoutHome: View {
             }
 
             if sessions.isEmpty {
-                ContentUnavailableView {
-                    Label("No sessions yet", systemImage: "dumbbell")
-                } description: {
-                    Text("Add a workout above, or set up a weekly schedule so today's session is one tap away.")
-                } actions: {
-                    Button("Set up schedule") { builder = true }
-                }
+                EmptyStateCard(icon: "dumbbell",
+                               title: "No sessions yet",
+                               message: "Start with a quick session, or set up a weekly schedule so the right workout is one tap away on the day.",
+                               primary: (title: "Set up schedule", action: { builder = true }))
             } else {
                 ForEach(sessions.prefix(30)) { workout in
                     NavigationLink { WorkoutEditor(workout: workout, profile: profile) } label: {
@@ -145,13 +142,13 @@ struct WorkoutHome: View {
         .navigationDestination(item: $opened) { WorkoutEditor(workout: $0, profile: profile) }
         .confirmationDialog("Delete this workout?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                             presenting: pendingDelete) { workout in
-            Button("Delete \(workout.name)", role: .destructive) { context.delete(workout); try? context.save() }
+            Button("Delete \(workout.name)", role: .destructive) { context.delete(workout); context.commit() }
         } message: { _ in Text("Sets and notes for this session will be removed.") }
     }
 
     private func start(_ workout: WorkoutEntity) {
         context.insert(workout)
-        try? context.save()
+        context.commit()
         Haptics.success()
         opened = workout
     }
@@ -216,7 +213,7 @@ struct AddWorkoutView: View {
 
     private func insert(_ workout: WorkoutEntity) {
         context.insert(workout)
-        try? context.save()
+        context.commit()
         dismiss()
     }
 }
@@ -261,7 +258,7 @@ struct StrengthSessionView: View {
             Section {
                 Button { addExercise = true } label: { Label("Add exercise", systemImage: "plus") }
                 if workout.completed {
-                    Button("Reopen workout") { workout.completed = false; try? context.save() }
+                    Button("Reopen workout") { workout.completed = false; context.commit() }
                 } else {
                     Button("Finish workout") { finish() }
                         .buttonStyle(.borderedProminent)
@@ -284,7 +281,7 @@ struct StrengthSessionView: View {
         .safeAreaInset(edge: .bottom) { if !workout.completed { RestTimerBar() } }
         .sheet(isPresented: $addExercise) { ExercisePicker(exclude: Set(workout.exercises.map(\.name))) { name in add(name) } }
         .confirmationDialog("Delete this workout?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { timer.cancel(); context.delete(workout); try? context.save(); dismiss() }
+            Button("Delete", role: .destructive) { timer.cancel(); context.delete(workout); context.commit(); dismiss() }
         }
     }
 
@@ -335,14 +332,14 @@ struct StrengthSessionView: View {
             }
             .onDelete { offsets in
                 offsets.map { ordered[$0] }.forEach(context.delete)
-                try? context.save()
+                context.commit()
             }
             TextField("Notes (seat 4, felt heavy…)", text: Bindable(exercise).notes, axis: .vertical)
                 .font(.subheadline)
             Button("Add set") {
                 let next = (exercise.sets.map(\.order).max() ?? -1) + 1
                 exercise.sets.append(SetEntity(order: next))
-                try? context.save()
+                context.commit()
             }
         } header: {
             HStack {
@@ -361,7 +358,7 @@ struct StrengthSessionView: View {
         } footer: {
             Button("Remove exercise", role: .destructive) {
                 context.delete(exercise)
-                try? context.save()
+                context.commit()
             }
             .font(.caption)
         }
@@ -412,7 +409,7 @@ struct StrengthSessionView: View {
     private func add(_ name: String) {
         let next = (workout.exercises.map(\.order).max() ?? -1) + 1
         workout.exercises.append(SessionExerciseEntity(name: name, order: next, sets: (0..<3).map { SetEntity(order: $0) }))
-        try? context.save()
+        context.commit()
         addExercise = false
     }
 
@@ -432,8 +429,13 @@ struct StrengthSessionView: View {
         }
         workout.completed = true
         timer.cancel()
-        try? context.save()
+        context.commit()
         Haptics.success()
+        var parts = ["Workout saved"]
+        if workout.durationMinutes > 0 { parts.append("\(Int(workout.durationMinutes)) min") }
+        let volume = workout.volumeKG
+        if volume > 0 { parts.append(Int(units.displayWeight(kilograms: volume)).formatted() + " " + units.weightUnit) }
+        ToastCenter.shared.show(parts.joined(separator: " · "))
     }
 }
 
@@ -515,7 +517,7 @@ private struct SetRow: View {
             Haptics.tap()
             onCompleted()
         }
-        try? context.save()
+        context.commit()
     }
 }
 
@@ -561,7 +563,7 @@ struct ExerciseLibraryView: View {
             if canCreate {
                 Button {
                     context.insert(ExerciseEntity(search.trimmingCharacters(in: .whitespaces), summary: "Custom exercise", tips: ["Move with control"], isCustom: true))
-                    try? context.save(); search = ""
+                    context.commit(); search = ""
                 } label: { Label("Add “\(search.trimmingCharacters(in: .whitespaces))” as a custom exercise", systemImage: "plus.circle") }
             }
             ForEach(sections, id: \.title) { section in
@@ -575,7 +577,7 @@ struct ExerciseLibraryView: View {
                         }
                         .swipeActions(edge: .trailing) {
                             if entity.isCustom {
-                                Button(role: .destructive) { context.delete(entity); try? context.save() } label: { Label("Delete", systemImage: "trash") }
+                                Button(role: .destructive) { context.delete(entity); context.commit() } label: { Label("Delete", systemImage: "trash") }
                             }
                         }
                     }
@@ -704,7 +706,7 @@ struct ExercisePicker: View {
 
     private func create(_ name: String) {
         context.insert(ExerciseEntity(name, summary: "Custom exercise", tips: ["Move with control"], isCustom: true))
-        try? context.save()
+        context.commit()
         onPick(name)
     }
 }
@@ -862,9 +864,12 @@ struct CardioEditor: View {
             }
             Section {
                 if workout.completed {
-                    Button("Reopen") { workout.completed = false; try? context.save() }
+                    Button("Reopen") { workout.completed = false; context.commit() }
                 } else {
-                    Button("Save & complete") { workout.completed = true; try? context.save(); Haptics.success() }
+                    Button("Save & complete") {
+                        workout.completed = true; context.commit(); Haptics.success()
+                        ToastCenter.shared.show("\(workout.name) saved · \(Int(workout.durationMinutes)) min")
+                    }
                         .buttonStyle(.borderedProminent)
                         .disabled(workout.durationMinutes <= 0)
                 }
@@ -877,7 +882,7 @@ struct CardioEditor: View {
         }
         .navigationTitle(workout.name)
         .confirmationDialog("Delete this workout?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { context.delete(workout); try? context.save(); dismiss() }
+            Button("Delete", role: .destructive) { context.delete(workout); context.commit(); dismiss() }
         }
     }
 
@@ -912,7 +917,7 @@ struct TemplateBuilderView: View {
                     let trimmed = name.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }
                     context.insert(TemplateEntity(name: trimmed, weekday: weekday))
-                    try? context.save()
+                    context.commit()
                     name = ""
                 }
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -964,14 +969,14 @@ struct TemplateBuilderView: View {
                         TextField("8–12", text: Bindable(template).repRange).multilineTextAlignment(.trailing)
                     }
                     NavigationLink("Exercises (\(template.exerciseNames.count))") { TemplateExercisesView(template: template) }
-                    Button("Delete template", role: .destructive) { context.delete(template); try? context.save() }
+                    Button("Delete template", role: .destructive) { context.delete(template); context.commit() }
                 } header: { Text(template.name) }
             }
         }
         .navigationTitle("Weekly Schedule")
         .toolbar {
             Button("Done") {
-                try? context.save()
+                context.commit()
                 // Scheduled days may have changed; keep the reminders in step.
                 let scheduled = templates
                 Task { await ReminderSettings.refreshWorkoutReminders(templates: scheduled) }
@@ -994,8 +999,9 @@ extension TemplateBuilderView {
                                       defaultSets: 3, repRange: "10–12")
         for exercise in day.exercises { template.append(exercise.name, sets: exercise.sets, reps: exercise.reps) }
         context.insert(template)
-        try? context.save()
+        context.commit()
         Haptics.success()
+        ToastCenter.shared.show("Added \(day.name)")
     }
 }
 
@@ -1020,8 +1026,8 @@ struct TemplateExercisesView: View {
                         }
                     }
                 }
-                .onDelete { template.remove(atOffsets: $0); try? context.save() }
-                .onMove { template.move(fromOffsets: $0, toOffset: $1); try? context.save() }
+                .onDelete { template.remove(atOffsets: $0); context.commit() }
+                .onMove { template.move(fromOffsets: $0, toOffset: $1); context.commit() }
             }
             Section {
                 Button { picker = true } label: { Label("Add exercise", systemImage: "plus") }
@@ -1034,7 +1040,7 @@ struct TemplateExercisesView: View {
         .sheet(isPresented: $picker) {
             ExercisePicker(exclude: Set(template.exerciseNames)) { name in
                 template.append(name)
-                try? context.save()
+                context.commit()
                 picker = false
             }
         }
@@ -1079,7 +1085,7 @@ struct TemplateExerciseEditor: View {
                     Button("Save") {
                         template.setSets(sets, at: index)
                         template.setReps(reps.trimmingCharacters(in: .whitespaces), at: index)
-                        try? context.save()
+                        context.commit()
                         dismiss()
                     }
                 }
