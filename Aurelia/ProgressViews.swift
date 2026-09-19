@@ -97,19 +97,17 @@ struct ProgressTabView: View {
     }
 
     private func weekRow(_ title: String, value: String, delta: Double?, format: (Double) -> String) -> some View {
-        HStack {
+        let change: String? = delta.map { abs($0) >= 0.05 ? ($0 > 0 ? "+" : "−") + format(abs($0)) : "same as last week" }
+        return HStack(alignment: .firstTextBaseline) {
             Text(title).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.subheadline.weight(.semibold))
-            if let delta, abs(delta) >= 0.05 {
-                Text((delta > 0 ? "+" : "−") + format(abs(delta)))
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(width: 84, alignment: .trailing)
-            } else {
-                Text(delta == nil ? "" : "same").font(.caption).foregroundStyle(.tertiary).frame(width: 84, alignment: .trailing)
+            Spacer(minLength: Theme.Spacing.sm)
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(value).font(.subheadline.weight(.semibold))
+                if let change { Text(change).font(.caption).foregroundStyle(.tertiary) }
             }
         }
         .font(.subheadline)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Weight
@@ -189,6 +187,8 @@ struct ProgressTabView: View {
                                     ProgressPhoto(filename: set.front).frame(width: 72, height: 96)
                                     Text(set.date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2).foregroundStyle(.secondary)
                                 }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel("Front photo, \(set.date.formatted(date: .abbreviated, time: .omitted))")
                             }
                         }
                     }

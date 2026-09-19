@@ -62,12 +62,13 @@ enum ImportService {
                                           SetEntity(order: setIndex, weightKG: set.weightKG, reps: set.reps,
                                                     completed: set.completed ?? (set.reps > 0), isWarmup: set.isWarmup ?? false, rpe: set.rpe)
                                       },
-                                      notes: exercise.notes ?? "")
+                                      notes: exercise.notes ?? "", supersetGroup: exercise.supersetGroup ?? 0)
             }
             let workout = WorkoutEntity(date: w.date, name: w.name, completed: w.completed, isCardio: w.isCardio,
                                         durationMinutes: w.durationMinutes, exercises: exercises)
             workout.distanceKM = w.distanceKM; workout.incline = w.incline; workout.speedKPH = w.speedKPH
             workout.calories = w.calories; workout.averageHeartRate = w.averageHeartRate; workout.notes = w.notes
+            workout.externalID = w.externalID
             context.insert(workout)
         }
         for f in export.foods {

@@ -25,7 +25,7 @@ extension WorkoutEntity {
             var copies: [SetEntity] = []
             for (setIndex, set) in sets.enumerated() { copies.append(SetEntity(order: setIndex, isWarmup: set.isWarmup)) }
             if copies.isEmpty { copies = (0..<3).map { SetEntity(order: $0) } }
-            exercises.append(SessionExerciseEntity(name: exercise.name, order: index, sets: copies))
+            exercises.append(SessionExerciseEntity(name: exercise.name, order: index, sets: copies, supersetGroup: exercise.supersetGroup))
         }
         return WorkoutEntity(date: date, name: previous.name, isCardio: previous.isCardio, exercises: exercises)
     }
@@ -36,6 +36,19 @@ extension WorkoutEntity {
             exercise.sets.filter { $0.completed && !$0.isWarmup }.map { (weightKG: $0.weightKG, reps: $0.reps) }
         }
         return Volume.total(sets: performed)
+    }
+}
+
+enum WorkoutActions {
+    /// Deletes a session. One imported from Apple Health is also remembered
+    /// so the next sync does not bring it back.
+    @MainActor
+    static func delete(_ workout: WorkoutEntity, context: ModelContext) {
+        if let id = workout.externalID { HealthSync.ignoreWorkout(externalID: id) }
+        RestTimer.shared.cancel()
+        context.delete(workout)
+        context.commit()
+        ToastCenter.shared.show("Workout deleted", style: .info)
     }
 }
 
@@ -142,8 +155,10 @@ struct WorkoutHome: View {
         .navigationDestination(item: $opened) { WorkoutEditor(workout: $0, profile: profile) }
         .confirmationDialog("Delete this workout?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                             presenting: pendingDelete) { workout in
-            Button("Delete \(workout.name)", role: .destructive) { context.delete(workout); context.commit() }
-        } message: { _ in Text("Sets and notes for this session will be removed.") }
+            Button("Delete \(workout.name)", role: .destructive) { WorkoutActions.delete(workout, context: context) }
+        } message: { workout in
+            Text(workout.isImported ? "It was imported from Apple Health and will not be imported again." : "Sets and notes for this session will be removed.")
+        }
     }
 
     private func start(_ workout: WorkoutEntity) {
@@ -166,6 +181,7 @@ struct WorkoutHome: View {
             if volume > 0 { parts.append(Int(units.displayWeight(kilograms: volume)).formatted() + " " + units.weightUnit) }
             if workout.durationMinutes > 0 { parts.append("\(Int(workout.durationMinutes)) min") }
         }
+        if workout.isImported { parts.append("Apple Health") }
         if !workout.completed { parts.append("in progress") }
         return parts.joined(separator: " · ")
     }
@@ -281,7 +297,61 @@ struct StrengthSessionView: View {
         .safeAreaInset(edge: .bottom) { if !workout.completed { RestTimerBar() } }
         .sheet(isPresented: $addExercise) { ExercisePicker(exclude: Set(workout.exercises.map(\.name))) { name in add(name) } }
         .confirmationDialog("Delete this workout?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { timer.cancel(); context.delete(workout); context.commit(); dismiss() }
+            Button("Delete", role: .destructive) { WorkoutActions.delete(workout, context: context); dismiss() }
+        }
+    }
+
+    // MARK: Supersets
+
+    /// "A", "B"… by the order groups first appear in the session.
+    private func supersetLetter(for exercise: SessionExerciseEntity) -> String? {
+        guard exercise.supersetGroup > 0 else { return nil }
+        let groups = orderedExercises.map(\.supersetGroup).filter { $0 > 0 }
+        var seen: [Int] = []
+        for g in groups where !seen.contains(g) { seen.append(g) }
+        guard let index = seen.firstIndex(of: exercise.supersetGroup) else { return nil }
+        return String(UnicodeScalar(65 + index) ?? "A")
+    }
+
+    private func partner(after exercise: SessionExerciseEntity) -> SessionExerciseEntity? {
+        guard exercise.supersetGroup > 0 else { return nil }
+        let group = orderedExercises.filter { $0.supersetGroup == exercise.supersetGroup }
+        guard let index = group.firstIndex(where: { $0.persistentModelID == exercise.persistentModelID }) else { return nil }
+        return index + 1 < group.count ? group[index + 1] : nil
+    }
+
+    private func next(after exercise: SessionExerciseEntity) -> SessionExerciseEntity? {
+        guard let index = orderedExercises.firstIndex(where: { $0.persistentModelID == exercise.persistentModelID }) else { return nil }
+        return index + 1 < orderedExercises.count ? orderedExercises[index + 1] : nil
+    }
+
+    private func supersetWithNext(_ exercise: SessionExerciseEntity) {
+        guard let following = next(after: exercise) else { return }
+        let group = exercise.supersetGroup > 0 ? exercise.supersetGroup
+            : (following.supersetGroup > 0 ? following.supersetGroup : (orderedExercises.map(\.supersetGroup).max() ?? 0) + 1)
+        exercise.supersetGroup = group
+        following.supersetGroup = group
+        context.commit()
+        Haptics.tap()
+    }
+
+    private func leaveSuperset(_ exercise: SessionExerciseEntity) {
+        let group = exercise.supersetGroup
+        exercise.supersetGroup = 0
+        // A group of one is not a superset.
+        let remaining = orderedExercises.filter { $0.supersetGroup == group }
+        if remaining.count == 1 { remaining[0].supersetGroup = 0 }
+        context.commit()
+    }
+
+    /// After a set: rest, unless a superset partner is next — then go straight to it.
+    private func setCompleted(in exercise: SessionExerciseEntity) {
+        guard !workout.completed else { return }
+        if let partner = partner(after: exercise) {
+            timer.cancel()
+            ToastCenter.shared.show("Next: \(partner.name)", style: .info)
+        } else if autoRest {
+            timer.start(seconds: restSeconds)
         }
     }
 
@@ -289,11 +359,9 @@ struct StrengthSessionView: View {
 
     private var summarySection: some View {
         Section {
-            HStack {
+            AdaptiveStack(spacing: Theme.Spacing.md) {
                 stat("Volume", Int(units.displayWeight(kilograms: workout.volumeKG)).formatted() + " " + units.weightUnit)
-                Divider()
                 stat("Sets", "\(doneSets) / \(workingSets)")
-                Divider()
                 VStack(alignment: .leading, spacing: 2) {
                     Text(workout.completed ? "Duration" : "Elapsed").font(.caption).foregroundStyle(.secondary)
                     if showsLiveTimer {
@@ -306,6 +374,10 @@ struct StrengthSessionView: View {
             }
             if workout.completed {
                 Label("Completed", systemImage: "checkmark.circle.fill").foregroundStyle(.sage).font(.subheadline)
+            }
+            if workout.isImported {
+                Text("Recorded by Apple Watch or another app. Add exercises below if you want the sets on record.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
     }
@@ -327,7 +399,7 @@ struct StrengthSessionView: View {
             ForEach(Array(ordered.enumerated()), id: \.element.id) { pair in
                 SetRow(entry: pair.element, number: numbers[pair.offset], units: units,
                        previous: Self.previousSet(previous, number: numbers[pair.offset]), bestWeightKG: best) {
-                    if autoRest && !workout.completed { timer.start(seconds: restSeconds) }
+                    setCompleted(in: exercise)
                 }
             }
             .onDelete { offsets in
@@ -343,6 +415,12 @@ struct StrengthSessionView: View {
             }
         } header: {
             HStack {
+                if let letter = supersetLetter(for: exercise) {
+                    Text("Superset \(letter)")
+                        .font(.caption2.weight(.bold)).textCase(nil)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color.sage.opacity(0.18), in: Capsule()).foregroundStyle(.sage)
+                }
                 Text(exercise.name)
                 if let reps = repRange(for: exercise.name) { Text("· \(reps)").foregroundStyle(.secondary) }
                 Spacer()
@@ -356,9 +434,18 @@ struct StrengthSessionView: View {
                 .buttonStyle(.borderless)
             }
         } footer: {
-            Button("Remove exercise", role: .destructive) {
-                context.delete(exercise)
-                context.commit()
+            HStack {
+                if exercise.supersetGroup > 0 {
+                    Button("Leave superset") { leaveSuperset(exercise) }
+                } else if next(after: exercise) != nil {
+                    Button("Superset with next") { supersetWithNext(exercise) }
+                }
+                Spacer()
+                Button("Remove exercise", role: .destructive) {
+                    if exercise.supersetGroup > 0 { leaveSuperset(exercise) }
+                    context.delete(exercise)
+                    context.commit()
+                }
             }
             .font(.caption)
         }
@@ -449,18 +536,38 @@ private struct SetRow: View {
     let bestWeightKG: Double
     let onCompleted: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var isPR: Bool { entry.completed && !entry.isWarmup && entry.reps > 0 && bestWeightKG > 0 && entry.weightKG > bestWeightKG }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button { toggle() } label: {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack(spacing: 10) { doneButton; numberMenu; Spacer(); if isPR { prTag } }
+                HStack(spacing: 10) { fields }
+            }
+            .opacity(entry.isWarmup && !entry.completed ? 0.7 : 1)
+        } else {
+            HStack(spacing: 10) {
+                doneButton
+                numberMenu
+                fields
+                if isPR { prTag }
+            }
+            .opacity(entry.isWarmup && !entry.completed ? 0.7 : 1)
+        }
+    }
+
+    private var doneButton: some View {
+        Button { toggle() } label: {
                 Image(systemName: entry.completed ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
                     .foregroundStyle(entry.completed ? Color.sage : Color.secondary)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(entry.completed ? "Mark set not done" : "Mark set done")
+    }
 
+    private var numberMenu: some View {
             Menu {
                 Toggle("Warm-up set", isOn: Bindable(entry).isWarmup)
                 Picker("RPE", selection: Bindable(entry).rpe) {
@@ -476,21 +583,24 @@ private struct SetRow: View {
             }
             .foregroundStyle(entry.isWarmup ? Color.secondary : Color.primary)
             .accessibilityLabel(entry.isWarmup ? "Warm-up set options" : "Set \(number) options")
+    }
 
-            DecimalField(placeholder: weightPlaceholder, value: weightBinding)
-                .textFieldStyle(.roundedBorder)
-            DecimalField(placeholder: repsPlaceholder, value: Bindable(entry).reps.zeroAsNil, integer: true)
-                .textFieldStyle(.roundedBorder)
+    @ViewBuilder private var fields: some View {
+        DecimalField(placeholder: weightPlaceholder, value: weightBinding)
+            .textFieldStyle(.roundedBorder)
+            .accessibilityLabel("Weight, \(units.weightUnit)")
+        DecimalField(placeholder: repsPlaceholder, value: Bindable(entry).reps.zeroAsNil, integer: true)
+            .textFieldStyle(.roundedBorder)
+            .accessibilityLabel("Reps")
+    }
 
-            if isPR {
-                Text("PR")
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Color.sage.opacity(0.18), in: Capsule())
-                    .foregroundStyle(.sage)
-            }
-        }
-        .opacity(entry.isWarmup && !entry.completed ? 0.7 : 1)
+    private var prTag: some View {
+        Text("PR")
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Color.sage.opacity(0.18), in: Capsule())
+            .foregroundStyle(.sage)
+            .accessibilityLabel("Personal record")
     }
 
     private var weightPlaceholder: String {
@@ -844,7 +954,10 @@ struct CardioEditor: View {
     var body: some View {
         Form {
             if workout.completed {
-                Section { Label("Completed", systemImage: "checkmark.circle.fill").foregroundStyle(.sage) }
+                Section {
+                    Label("Completed", systemImage: "checkmark.circle.fill").foregroundStyle(.sage)
+                    if workout.isImported { Text(workout.notes).font(.footnote).foregroundStyle(.secondary) }
+                }
             }
             Section("Session") {
                 LabeledContent("Duration (minutes)") { DecimalField(placeholder: "30", value: Bindable(workout).durationMinutes.zeroAsNil, integer: true) }
@@ -882,7 +995,7 @@ struct CardioEditor: View {
         }
         .navigationTitle(workout.name)
         .confirmationDialog("Delete this workout?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { context.delete(workout); context.commit(); dismiss() }
+            Button("Delete", role: .destructive) { WorkoutActions.delete(workout, context: context); dismiss() }
         }
     }
 

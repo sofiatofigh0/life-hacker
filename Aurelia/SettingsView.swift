@@ -51,6 +51,8 @@ struct SettingsView: View {
     @AppStorage(ReminderSettings.dailyMinutesKey) private var dailyMinutes = ReminderSettings.defaultDailyMinutes
     @AppStorage("aurelia.restSeconds") private var restSeconds = 90
     @AppStorage("aurelia.autoRest") private var autoRest = true
+    @AppStorage(Appearance.key) private var appearance = Appearance.system.rawValue
+    @AppStorage(HealthSync.importWorkoutsKey) private var importHealthWorkouts = true
 
     private var units: UnitSystem { profile.units }
 
@@ -64,6 +66,11 @@ struct SettingsView: View {
             remindersSection
             dataSection
             demoSection
+            Section("Appearance") {
+                Picker("Theme", selection: $appearance) {
+                    ForEach(Appearance.allCases, id: \.rawValue) { Text($0.label).tag($0.rawValue) }
+                }
+            }
             Section {
                 Text("Health data and progress photos remain on this device. Only food search text and barcodes are sent to nutrition providers.")
                     .font(.footnote)
@@ -229,6 +236,7 @@ struct SettingsView: View {
                 if let diagnosis = sync.diagnosis {
                     Text(diagnosis).font(.footnote).foregroundStyle(.orange)
                 }
+                Toggle("Import workouts from Health", isOn: $importHealthWorkouts)
                 if sync.lastError == nil, sync.diagnosis == nil, let last = sync.lastSynced {
                     Text("Last synced \(last.formatted(date: .omitted, time: .shortened)). Runs automatically when the app opens.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -239,7 +247,7 @@ struct SettingsView: View {
             }
         } header: { Text("Apple Health") } footer: {
             if sync.isAvailable && !demo.isEnabled {
-                Text("Tap Connect / Refresh and the line above says where things stand.")
+                Text("Workouts recorded by Apple Watch or another app appear in the Workout tab once, marked with their source. One you log yourself within 90 minutes of a Watch session counts as the same session. Deleting an imported workout keeps it out for good.")
             }
         }
     }

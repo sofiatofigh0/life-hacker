@@ -68,15 +68,14 @@ struct ContainerSwitcher: View {
     let storeFailure: String?
     @State private var demo = DemoModeController.shared
     @State private var demoContainer: ModelContainer?
+    @AppStorage(Appearance.key) private var appearance = Appearance.system.rawValue
 
     var body: some View {
         let active = demo.isEnabled ? (demoContainer ?? real) : real
         RootView(storeFailure: demo.isEnabled ? nil : storeFailure)
             .modelContainer(active)
             .id("\(demo.isEnabled)-\(demo.generation)-\(demo.viewGeneration)-\(demoContainer == nil)")
-            // A cream and sage palette is designed for light appearance; the
-            // cards use `.background`, which went black in dark mode.
-            .preferredColorScheme(.light)
+            .preferredColorScheme((Appearance(rawValue: appearance) ?? .system).colorScheme)
             .onChange(of: demo.isEnabled, initial: true) { _, enabled in
                 if enabled && demoContainer == nil { demoContainer = Persistence.makeDemoContainer() }
             }
@@ -141,16 +140,32 @@ struct MainTabs: View {
 
 /// The single source of truth for the palette. Kept separate from the two
 /// extensions below so neither can resolve `Color.sage` back to itself.
+///
+/// Every colour has a light and a dark value. Dark keeps the same warmth:
+/// a deep warm grey ground, slightly lifted cards, and a lighter sage that
+/// keeps its contrast on the dark ground.
 enum Palette {
-    static let sage = Color(red: 0.38, green: 0.49, blue: 0.42)
-    static let cream = Color(red: 0.97, green: 0.95, blue: 0.91)
-    static let charcoal = Color(red: 0.18, green: 0.18, blue: 0.17)
+    private static func adaptive(light: (Double, Double, Double), dark: (Double, Double, Double)) -> Color {
+        Color(uiColor: UIColor { trait in
+            let c = trait.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: c.0, green: c.1, blue: c.2, alpha: 1)
+        })
+    }
+    static let sage = adaptive(light: (0.38, 0.49, 0.42), dark: (0.58, 0.70, 0.61))
+    static let cream = adaptive(light: (0.97, 0.95, 0.91), dark: (0.12, 0.12, 0.11))
+    static let charcoal = adaptive(light: (0.18, 0.18, 0.17), dark: (0.92, 0.91, 0.88))
+    /// The screen behind cards.
+    static let ground = adaptive(light: (0.986, 0.977, 0.960), dark: (0.09, 0.09, 0.085))
+    /// Card surface: white on light, lifted warm grey on dark.
+    static let card = adaptive(light: (1, 1, 1), dark: (0.16, 0.16, 0.15))
 }
 
 extension Color {
     static let sage = Palette.sage
     static let cream = Palette.cream
     static let charcoal = Palette.charcoal
+    static let ground = Palette.ground
+    static let card = Palette.card
 }
 
 /// Leading-dot syntax in a `ShapeStyle` position — `.foregroundStyle(.sage)`,
@@ -242,7 +257,7 @@ struct WellnessCard<Content: View>: View {
         content
             .padding(Theme.Spacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.background, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+            .background(Color.card, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card).stroke(Theme.hairline))
             .shadow(color: Theme.Shadow.cardColor, radius: Theme.Shadow.cardRadius, y: Theme.Shadow.cardY)
     }
@@ -266,7 +281,7 @@ struct TabScreen<Trailing: View, Content: View>: View {
             }
             .padding(Theme.Spacing.lg)
         }
-        .background(Color.cream.opacity(0.45))
+        .background(Color.ground)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(hidesNavigationBar ? .hidden : .visible, for: .navigationBar)
@@ -289,7 +304,7 @@ struct HeaderButton: View {
             Image(systemName: systemImage)
                 .font(.title3)
                 .frame(width: 44, height: 44)
-                .background(.background, in: Circle())
+                .background(Color.card, in: Circle())
                 .overlay(Circle().stroke(Theme.hairline))
                 .shadow(color: Theme.Shadow.cardColor, radius: Theme.Shadow.cardRadius, y: Theme.Shadow.cardY)
         }

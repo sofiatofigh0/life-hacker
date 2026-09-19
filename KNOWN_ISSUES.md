@@ -13,6 +13,16 @@ and includes the first real schema migration (V1 → V2).
 
 ---
 
+## Added in the next-steps pass
+
+| # | Item |
+|---|---|
+| N1 | **Large text.** The set row, session summary, food totals, week rows and rest bar switch to stacked layouts at accessibility text sizes (`AdaptiveStack`). Still needs a look on a device at the largest sizes (X3 remains open for that check). |
+| N2 | **Dark mode.** The palette is adaptive: a deep warm ground, lifted cards, lighter sage. Settings → Appearance: Match iPhone / Light / Dark. Closes X1 pending a look on a real screen. |
+| N3 | **Supersets.** Schema V4 adds `SessionExerciseEntity.supersetGroup`. In a session: "Superset with next" / "Leave superset" under each exercise, an A/B tag in the header, and ticking a set in a superset skips the rest timer and points to the partner. Repeat copies the grouping; export/restore carry it. |
+| N4 | **Apple Health workout import.** Schema V4 adds `WorkoutEntity.externalID`. Sync imports Watch / Health workouts from the last 14 days once each, skipping any within 90 minutes of a hand-logged session; deleting an imported one keeps it out. Toggle in Settings → Apple Health. Closes X4. |
+| N5 | Exercise demonstration media: **not built**, by request. The exercise page keeps the YouTube search link (X11 stays open). |
+
 ## Added in the polish pass
 
 | # | Item |
@@ -133,7 +143,7 @@ The profile has always stored metric and had a units picker, but almost no scree
 
 | # | Item | Why deferred |
 |---|---|---|
-| X1 | **Dark mode palette.** | The app is light-only for now. Doing dark properly means a second palette designed and checked on a real screen, not guessed from Linux. |
+| ~~X1~~ | Dark mode palette. | **Done** (N2); check it on a real screen. |
 | X2 | **Accessibility pass** (VoiceOver labels on the ring and calendar cells, Dynamic Type at the largest sizes, reduced motion). | Labels were added where obvious, but a real pass needs VoiceOver running. |
 | X3 | **Layout at the largest text sizes.** The dense checklist rows will wrap awkwardly at accessibility sizes. | Same — needs a device. |
 
@@ -141,7 +151,7 @@ The profile has always stored metric and had a units picker, but almost no scree
 
 | # | Item | Why deferred |
 |---|---|---|
-| X4 | **Import Apple Health workouts** (Apple Watch sessions) and de-duplicate against manual logs. | Read authorization is already requested. The hard part is de-duplication rules (a Watch "Traditional Strength Training" vs. the app's logged session at the same time) and that deserves its own design. |
+| ~~X4~~ | Import Apple Health workouts. | **Done** (N4) with a 90-minute rule against hand-logged sessions and a tombstone for deletions. |
 | X5 | **Background Health delivery** (`HKObserverQuery` + background delivery) so steps update without opening the app. | Requires the Background Modes capability and careful battery behaviour. Foreground sync on launch/return covers daily use. |
 | ~~X7~~ | Saved meals UI. | **Done** in the product-review pass (R3). |
 | ~~X8~~ | Edit a logged food's amount in place. | **Done** (R3): macros rescale from the ratio they were logged at. |
@@ -149,7 +159,7 @@ The profile has always stored metric and had a units picker, but almost no scree
 | X10 | **Food amounts in ounces** for imperial users. | Nutrition data is per 100 g everywhere; a display-only oz conversion is straightforward but needs the serving UI reworked. |
 | X19 | **Merge on restore.** Restore is replace-only. | Merge needs duplicate rules per record type; replace is predictable and covers the backup use case. |
 | X11 | **Exercise demonstration media.** | Needs licensed assets. |
-| X20 | **Supersets / circuits.** | Changes the session model (grouping) and the set-row layout; do it after the new session screen has been used for a few weeks. |
+| ~~X20~~ | Supersets. | **Done** (N3). |
 | X21 | **Adaptive calorie targets** from intake and weight trend (MacroFactor-style). | Needs 2–3 weeks of consistent logs to be meaningful and a careful explanation in the UI. |
 | ~~X12~~ | Reorder supplements. | **Done** (R6). |
 

@@ -125,13 +125,14 @@ public struct WorkoutRecord: Codable, Equatable, Sendable {
     public var distanceKM: Double?, incline: Double?, speedKPH: Double?
     public var calories: Double?, averageHeartRate: Double?, notes: String
     public var exercises: [WorkoutExerciseRecord]
+    public var externalID: String?
     public init(date: Date, name: String, completed: Bool, isCardio: Bool, durationMinutes: Double,
                 distanceKM: Double?, incline: Double?, speedKPH: Double?, calories: Double?,
-                averageHeartRate: Double?, notes: String, exercises: [WorkoutExerciseRecord]) {
+                averageHeartRate: Double?, notes: String, exercises: [WorkoutExerciseRecord], externalID: String? = nil) {
         self.date = date; self.name = name; self.completed = completed; self.isCardio = isCardio
         self.durationMinutes = durationMinutes; self.distanceKM = distanceKM; self.incline = incline
         self.speedKPH = speedKPH; self.calories = calories; self.averageHeartRate = averageHeartRate
-        self.notes = notes; self.exercises = exercises
+        self.notes = notes; self.exercises = exercises; self.externalID = externalID
     }
 }
 

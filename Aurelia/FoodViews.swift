@@ -92,9 +92,8 @@ struct FoodView: View {
 
     private var totalsCard: some View {
         WellnessCard {
-            HStack(alignment: .top) {
+            AdaptiveStack(spacing: Theme.Spacing.md) {
                 metric("Calories", value: total.calories, target: calorieTarget, unit: "kcal", over: calorieRatio > 1.1)
-                Divider()
                 metric("Protein", value: total.protein, target: proteinTarget, unit: "g", over: false)
             }
             Divider().padding(.vertical, 8)

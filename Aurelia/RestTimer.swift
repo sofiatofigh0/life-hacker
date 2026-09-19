@@ -78,7 +78,7 @@ struct RestTimerBar: View {
     @AppStorage("aurelia.restSeconds") private var defaultSeconds = 90
 
     var body: some View {
-        HStack(spacing: 10) {
+        AdaptiveStack(spacing: 10) {
             if timer.isRunning {
                 Image(systemName: "timer").foregroundStyle(.sage)
                 Text(RestTimer.format(timer.remaining))

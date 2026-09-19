@@ -26,7 +26,21 @@ final class HealthSync {
     private(set) var hasEverReceivedData = false
 
     static let weightSource = "Apple Health"
+    static let importWorkoutsKey = "aurelia.importHealthWorkouts"
+    private static let ignoredWorkoutsKey = "aurelia.ignoredHealthWorkouts"
     private let service = HealthKitService.shared
+
+    /// Whether Health workouts are brought into the log. On by default.
+    static var importsWorkouts: Bool {
+        UserDefaults.standard.object(forKey: importWorkoutsKey) as? Bool ?? true
+    }
+
+    /// Imported workouts the person deleted must stay deleted on the next sync.
+    static func ignoreWorkout(externalID: String) {
+        var ids = Set(UserDefaults.standard.stringArray(forKey: ignoredWorkoutsKey) ?? [])
+        ids.insert(externalID)
+        UserDefaults.standard.set(Array(ids), forKey: ignoredWorkoutsKey)
+    }
 
     var isAvailable: Bool { HealthKitService.isAvailable }
 
@@ -109,13 +123,53 @@ final class HealthSync {
                     upsertHealthWeight(on: day, kilograms: mass.kilograms, sampleDate: mass.date, context: context)
                 }
             }
+            if Self.importsWorkouts, let start = calendar.date(byAdding: .day, value: -(days - 1), to: today) {
+                let imported = try await importWorkouts(from: start, context: context)
+                if imported > 0 { receivedAnything = true }
+            }
             try context.save()
             lastSynced = .now
             lastError = nil
             if receivedAnything { hasEverReceivedData = true }
         } catch {
+            Log.health.error("sync failed: \(error.localizedDescription, privacy: .public)")
             lastError = error.localizedDescription
         }
+    }
+
+    // MARK: Workouts from Health
+
+    /// Brings Apple Watch / Health workouts into the log, once each.
+    ///
+    /// De-duplication rules, in order:
+    /// 1. Already imported (same Health UUID) → skip.
+    /// 2. Deleted by the person after an earlier import → skip forever.
+    /// 3. A workout logged by hand starts within 90 minutes of it → skip; the
+    ///    hand-logged session is the record and the Watch one is the same event.
+    /// Returns how many were added.
+    private func importWorkouts(from start: Date, context: ModelContext) async throws -> Int {
+        let candidates = try await service.workouts(from: start, to: .now)
+        guard !candidates.isEmpty else { return 0 }
+        let existing = (try? context.fetch(FetchDescriptor<WorkoutEntity>(predicate: #Predicate { $0.date >= start }))) ?? []
+        let importedIDs = Set(existing.compactMap(\.externalID))
+        let ignored = Set(UserDefaults.standard.stringArray(forKey: Self.ignoredWorkoutsKey) ?? [])
+        let manualDates = existing.filter { $0.externalID == nil }.map(\.date)
+        let window: TimeInterval = 90 * 60
+        var added = 0
+        for candidate in candidates where candidate.minutes >= 1 {
+            if importedIDs.contains(candidate.id) || ignored.contains(candidate.id) { continue }
+            if manualDates.contains(where: { abs($0.timeIntervalSince(candidate.start)) < window }) { continue }
+            let workout = WorkoutEntity(date: candidate.start, name: candidate.name, completed: true,
+                                        isCardio: !candidate.isStrength, durationMinutes: candidate.minutes.rounded())
+            workout.externalID = candidate.id
+            workout.distanceKM = candidate.distanceKM
+            workout.calories = candidate.calories
+            workout.averageHeartRate = try? await service.averageHeartRate(from: candidate.start, to: candidate.end)
+            workout.notes = "Recorded by \(candidate.source)"
+            context.insert(workout)
+            added += 1
+        }
+        return added
     }
 
     // MARK: Upserts

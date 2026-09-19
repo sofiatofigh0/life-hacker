@@ -18,7 +18,7 @@ The app has been through a full-screen audit and a product-review pass (see
 [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for the register and [`PRODUCT_REVIEW.md`](PRODUCT_REVIEW.md) for the
 walkthrough, the competitive comparison, and the fix list). Both rewrote most of the view layer; the code
 parses cleanly but the next ⌘R is its first real type check. Expect a round of diagnostics, as with every
-change so far. **This build migrates the data store to schema V3 on first launch** (V2 added set logging, V3 per-exercise sets and rep ranges in templates).
+change so far. **This build migrates the data store to schema V4 on first launch** (V2 set logging, V3 per-exercise sets and reps, V4 supersets and Health workout import).
 
 ## What is implemented
 
@@ -32,8 +32,8 @@ change so far. **This build migrates the data store to schema V3 on first launch
 - Strength sessions the way Strong and Hevy do them: last time's numbers as placeholders, tick a set to
   complete it (adopting those numbers), a rest timer pinned to the bottom that notifies you when the phone is
   locked, PR badges, warm-up and RPE per set, per-exercise notes, and a session summary (volume, sets,
-  live elapsed time). Finishing records the duration and tidies untouched sets. Every exercise has a
-  history chart and all-time best.
+  live elapsed time), supersets. Finishing records the duration and tidies untouched sets. Every exercise
+  has a history chart and all-time best.
 - Meal-grouped food history with remaining-calorie framing, tap-to-edit entries, quick add, saved meals,
   copy yesterday, add-and-log-another, cached recent/frequent foods, gram-based macro math, manual foods,
   USDA proxy search, Open Food Facts barcode lookup, and camera scanner.
@@ -42,7 +42,10 @@ change so far. **This build migrates the data store to schema V3 on first launch
 - Reminders: workout days (derived from the scheduled templates), an evening log check-in, and weekly photos.
 - **Apple Health sync**: steps, active and resting energy, and average heart rate are imported for the
   last 14 days on launch, on return to the foreground, and on demand. Weights logged in the app are written
-  to Health; weights recorded elsewhere (a scale) are imported for days with no manual entry.
+  to Health; weights recorded elsewhere (a scale) are imported for days with no manual entry. Workouts
+  recorded by Apple Watch or another app are imported once each, skipping any within 90 minutes of a
+  session you logged yourself.
+- Light and dark appearance (Settings → Appearance), and layouts that stack at accessibility text sizes.
 - Full unit awareness: every field and display follows the profile's imperial/metric choice.
 - One design system (`Aurelia/DesignSystem.swift`): tokens, cards, empty states, and toasts. Every action that
   matters confirms itself, every failed save says so, and removing a food entry offers Undo.
@@ -65,8 +68,8 @@ Your logs live in one SwiftData database inside the app's container. They surviv
 2. **You install over the top** — ⌘R from Xcode, or a rebuild after the 7-day free-team expiry. Never
    delete the app to "reinstall cleanly"; that deletes the database and the photos.
 3. **Model changes go through the migration plan** in `Aurelia/Persistence.swift`. Schema V1 is frozen
-   there, V2 (set completion, warm-up, RPE, exercise notes) and V3 (per-exercise sets and reps in
-   templates) migrate from it automatically. Content that
+   there; V2 (set completion, warm-up, RPE, exercise notes), V3 (per-exercise sets and reps in templates)
+   and V4 (supersets, Health workout import) migrate from it automatically. Content that
    only needs to grow — the exercise and food catalogs — is code, not schema, precisely so updates don't
    migrate anything. If a store ever fails to open, the orange banner offers **Start fresh**, which erases
    it only after you confirm; the app never deletes data on its own.

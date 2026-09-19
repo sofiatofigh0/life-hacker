@@ -174,9 +174,9 @@ reflection); Noom and Future (coaching tone); Structured (scheduling).
 
 | # | Item | Why not now |
 |---|---|---|
-| D1 | **Apple Watch / Health workout import** with de-duplication against manual sessions | Needs a de-dup rule (a Watch "Traditional Strength Training" at 18:02 vs. the app's session at 18:00) that should be designed with real data from the user's Watch, not guessed |
-| D2 | **Dark mode** | A second palette designed on a real screen; the cream/sage system is light by design |
-| D3 | **Supersets / circuits** | Changes the session data model (grouping) and the set-row layout; worth doing after the new session screen has been used for a few weeks |
+| ~~D1~~ | Apple Watch / Health workout import | **Done.** Imported once each; a hand-logged session within 90 minutes wins; deletions are remembered. |
+| ~~D2~~ | Dark mode | **Done** as an adaptive palette with a Settings choice; verify on device. |
+| ~~D3~~ | Supersets | **Done** (schema V4). |
 | D4 | **Adaptive calorie targets** (MacroFactor-style weekly recalculation from intake and weight trend) | Needs 2–3 weeks of consistent logging to be meaningful, and a careful explanation so it does not feel like the app "changed my number" |
 | D5 | **Accessibility pass** with VoiceOver running | Labels added where obvious; the set row (five controls) needs testing with VoiceOver on |
 | D6 | **Food amounts in ounces / household measures** | Display-only conversion is easy; the serving UI needs redesign to avoid mixing units |

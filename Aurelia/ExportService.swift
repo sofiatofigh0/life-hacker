@@ -33,8 +33,9 @@ enum ExportService {
                         exerciseName: exercise.name,
                         sets: exercise.sets.sorted { $0.order < $1.order }
                             .map { ExerciseSetRecord(weightKG: $0.weightKG, reps: $0.reps, completed: $0.completed, isWarmup: $0.isWarmup, rpe: $0.rpe) },
-                        notes: exercise.notes)
-                })
+                        notes: exercise.notes, supersetGroup: exercise.supersetGroup == 0 ? nil : exercise.supersetGroup)
+                },
+                externalID: workout.externalID)
         }
 
         return AureliaExport(

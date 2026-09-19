@@ -29,6 +29,48 @@ enum Theme {
     static let hairline = Color.primary.opacity(0.06)
 }
 
+// MARK: - Layout
+
+/// Horizontal normally; vertical at accessibility text sizes, where five
+/// controls in a row no longer fit.
+struct AdaptiveStack<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+    var alignment: HorizontalAlignment = .leading
+    var spacing: CGFloat = Theme.Spacing.sm
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: alignment, spacing: spacing) { content }
+        } else {
+            HStack(spacing: spacing) { content }
+        }
+    }
+}
+
+// MARK: - Appearance
+
+/// System, light, or dark. Stored as a string so the default (system) needs no migration.
+enum Appearance: String, CaseIterable {
+    case system, light, dark
+    static let key = "aurelia.appearance"
+
+    var label: String {
+        switch self {
+        case .system: return "Match iPhone"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 // MARK: - Logging
 
 enum Log {

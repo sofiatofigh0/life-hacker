@@ -110,7 +110,10 @@ public struct ExerciseSetRecord: Identifiable, Codable, Equatable, Sendable {
 }
 public struct WorkoutExerciseRecord: Identifiable, Codable, Equatable, Sendable {
     public var id = UUID(); public var exerciseName: String; public var sets: [ExerciseSetRecord]; public var notes: String?
-    public init(exerciseName: String, sets: [ExerciseSetRecord], notes: String? = nil) { self.exerciseName = exerciseName; self.sets = sets; self.notes = notes }
+    public var supersetGroup: Int?
+    public init(exerciseName: String, sets: [ExerciseSetRecord], notes: String? = nil, supersetGroup: Int? = nil) {
+        self.exerciseName = exerciseName; self.sets = sets; self.notes = notes; self.supersetGroup = supersetGroup
+    }
 }
 public struct WorkoutTemplateValue: Identifiable, Codable, Equatable, Sendable {
     public var id = UUID(); public var name: String; public var exercises: [WorkoutExerciseRecord]

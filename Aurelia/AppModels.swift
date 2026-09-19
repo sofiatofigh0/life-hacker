@@ -76,16 +76,21 @@ import SwiftData
 @Model final class WorkoutEntity {
     var date: Date; var name: String; var completed: Bool; var isCardio: Bool; var durationMinutes: Double
     var distanceKM: Double?; var incline: Double?; var speedKPH: Double?; var calories: Double?; var averageHeartRate: Double?; var notes: String
+    /// Apple Health workout UUID when this row was imported, so it is never imported twice.
+    var externalID: String?
     @Relationship(deleteRule: .cascade, inverse: \SessionExerciseEntity.workout) var exercises: [SessionExerciseEntity]
     init(date: Date = .now, name: String, completed: Bool = false, isCardio: Bool = false, durationMinutes: Double = 0, exercises: [SessionExerciseEntity] = []) { self.date = date; self.name = name; self.completed = completed; self.isCardio = isCardio; self.durationMinutes = durationMinutes; self.notes = ""; self.exercises = exercises }
+    var isImported: Bool { externalID != nil }
 }
 @Model final class SessionExerciseEntity {
     var name: String; var order: Int
     /// Per-exercise note for this session ("felt heavy", "seat 4").
     var notes: String = ""
+    /// Exercises sharing a non-zero group are performed back to back (a superset).
+    var supersetGroup: Int = 0
     var workout: WorkoutEntity?
     @Relationship(deleteRule: .cascade, inverse: \SetEntity.exercise) var sets: [SetEntity]
-    init(name: String, order: Int, sets: [SetEntity], notes: String = "") { self.name = name; self.order = order; self.sets = sets; self.notes = notes }
+    init(name: String, order: Int, sets: [SetEntity], notes: String = "", supersetGroup: Int = 0) { self.name = name; self.order = order; self.sets = sets; self.notes = notes; self.supersetGroup = supersetGroup }
 }
 @Model final class SetEntity {
     var order: Int; var weightKG: Double; var reps: Int

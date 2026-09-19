@@ -212,6 +212,89 @@ actor HealthKitService: HealthProviding {
         }
     }
 
+    /// A workout recorded by Apple Watch, the iPhone, or another app.
+    struct ImportedWorkout: Sendable {
+        let id: String
+        let name: String
+        let start: Date
+        let end: Date
+        let isStrength: Bool
+        let distanceKM: Double?
+        let calories: Double?
+        let source: String
+        var minutes: Double { end.timeIntervalSince(start) / 60 }
+    }
+
+    /// Workouts that ended within the range, oldest first.
+    func workouts(from start: Date, to end: Date) async throws -> [ImportedWorkout] {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)
+        let samples: [HKSample] = try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [sort]) { _, samples, error in
+                if let error, !Self.isNoData(error) { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: samples ?? []) }
+            }
+            store.execute(query)
+        }
+        return samples.compactMap { sample -> ImportedWorkout? in
+            guard let workout = sample as? HKWorkout else { return nil }
+            let meters = workout.totalDistance?.doubleValue(for: .meter())
+            let kcal = workout.totalEnergyBurned?.doubleValue(for: .kilocalorie())
+            return ImportedWorkout(id: workout.uuid.uuidString, name: Self.name(for: workout.workoutActivityType),
+                                   start: workout.startDate, end: workout.endDate,
+                                   isStrength: Self.isStrength(workout.workoutActivityType),
+                                   distanceKM: meters.map { $0 / 1000 }.flatMap { $0 > 0 ? $0 : nil },
+                                   calories: kcal.flatMap { $0 > 0 ? $0 : nil },
+                                   source: workout.sourceRevision.source.name)
+        }
+    }
+
+    /// Average heart rate over an arbitrary interval (a workout).
+    func averageHeartRate(from start: Date, to end: Date) async throws -> Double? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: HKQuery.predicateForSamples(withStart: start, end: end),
+                                          options: .discreteAverage) { _, result, error in
+                if let error, !Self.isNoData(error) { continuation.resume(throwing: error); return }
+                continuation.resume(returning: result?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())))
+            }
+            store.execute(query)
+        }
+    }
+
+    private static func isStrength(_ type: HKWorkoutActivityType) -> Bool {
+        switch type {
+        case .traditionalStrengthTraining, .functionalStrengthTraining, .crossTraining: return true
+        default: return false
+        }
+    }
+
+    private static func name(for type: HKWorkoutActivityType) -> String {
+        switch type {
+        case .walking: return "Walking"
+        case .running: return "Running"
+        case .cycling: return "Cycling"
+        case .hiking: return "Hiking"
+        case .swimming: return "Swimming"
+        case .elliptical: return "Elliptical"
+        case .rowing: return "Rowing"
+        case .stairClimbing, .stairs: return "Stair Climber"
+        case .traditionalStrengthTraining: return "Strength Training"
+        case .functionalStrengthTraining: return "Functional Training"
+        case .crossTraining: return "Cross Training"
+        case .highIntensityIntervalTraining: return "HIIT"
+        case .yoga: return "Yoga"
+        case .pilates: return "Pilates"
+        case .coreTraining: return "Core Training"
+        case .flexibility, .cooldown: return "Stretching"
+        case .dance, .cardioDance, .socialDance: return "Dance"
+        case .mixedCardio: return "Cardio"
+        case .jumpRope: return "Jump Rope"
+        case .kickboxing, .boxing: return "Boxing"
+        default: return "Workout"
+        }
+    }
+
     /// Writes a body-mass sample. Silently does nothing without share permission,
     /// so a weight log never fails just because Health is disconnected.
     func saveBodyMass(kilograms: Double, date: Date) async throws {

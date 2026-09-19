@@ -55,8 +55,8 @@ enum AureliaSchemaV2: VersionedSchema {
     static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
-        [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
-         SessionExerciseEntity.self, SetEntity.self, FoodEntity.self, FoodLogEntity.self,
+        [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, AureliaSchemaV3.WorkoutEntity.self,
+         AureliaSchemaV3.SessionExerciseEntity.self, AureliaSchemaV3.SetEntity.self, FoodEntity.self, FoodLogEntity.self,
          SavedMealEntity.self, WaterEntity.self, SupplementEntity.self, SupplementCheckEntity.self,
          WeightEntity.self, ActivityEntity.self, PhotoSetEntity.self]
     }
@@ -67,10 +67,44 @@ enum AureliaSchemaV2: VersionedSchema {
     }
 }
 
-/// Version 3 (current). Changes from V2:
+/// Version 3. Changes from V2:
 /// - `TemplateEntity`: + `setCounts: [Int]`, `repRanges: [String]` (per-exercise overrides)
+///
+/// The workout/exercise/set shapes changed in V4, so their V2–V3 shapes are
+/// frozen here as a self-contained relationship chain. Never edit.
 enum AureliaSchemaV3: VersionedSchema {
     static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
+         SessionExerciseEntity.self, SetEntity.self, FoodEntity.self, FoodLogEntity.self,
+         SavedMealEntity.self, WaterEntity.self, SupplementEntity.self, SupplementCheckEntity.self,
+         WeightEntity.self, ActivityEntity.self, PhotoSetEntity.self]
+    }
+
+    @Model final class WorkoutEntity {
+        var date: Date; var name: String; var completed: Bool; var isCardio: Bool; var durationMinutes: Double
+        var distanceKM: Double?; var incline: Double?; var speedKPH: Double?; var calories: Double?; var averageHeartRate: Double?; var notes: String
+        @Relationship(deleteRule: .cascade, inverse: \SessionExerciseEntity.workout) var exercises: [SessionExerciseEntity]
+        init() { date = .now; name = ""; completed = false; isCardio = false; durationMinutes = 0; notes = ""; exercises = [] }
+    }
+    @Model final class SessionExerciseEntity {
+        var name: String; var order: Int; var notes: String = ""; var workout: WorkoutEntity?
+        @Relationship(deleteRule: .cascade, inverse: \SetEntity.exercise) var sets: [SetEntity]
+        init() { name = ""; order = 0; sets = [] }
+    }
+    @Model final class SetEntity {
+        var order: Int; var weightKG: Double; var reps: Int; var completed: Bool = false; var isWarmup: Bool = false; var rpe: Int?
+        var exercise: SessionExerciseEntity?
+        init() { order = 0; weightKG = 0; reps = 0 }
+    }
+}
+
+/// Version 4 (current). Changes from V3:
+/// - `WorkoutEntity`: + `externalID` (Apple Health import de-duplication)
+/// - `SessionExerciseEntity`: + `supersetGroup`
+enum AureliaSchemaV4: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(4, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
@@ -83,27 +117,28 @@ enum AureliaSchemaV3: VersionedSchema {
 /// The ordered history of schema versions. SwiftData walks this to bring an
 /// older store forward to the current one.
 ///
-/// **Adding V4:** freeze the V3 shapes of any model you change into
-/// `AureliaSchemaV3` (as V1 and V2 do above), define V4 with the new shapes,
-/// append it to `schemas`, and add a stage. Additive changes are `.lightweight`;
+/// **Adding V5:** freeze the V4 shapes of any model you change into
+/// `AureliaSchemaV4` (as the versions above do), define V5 with the new
+/// shapes, append it to `schemas`, and add a stage. Additive changes are `.lightweight`;
 /// renames, type changes, and required fields without defaults need `.custom`.
 enum AureliaMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self, AureliaSchemaV2.self, AureliaSchemaV3.self] }
+    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self, AureliaSchemaV2.self, AureliaSchemaV3.self, AureliaSchemaV4.self] }
 
     static var stages: [MigrationStage] {
         [.lightweight(fromVersion: AureliaSchemaV1.self, toVersion: AureliaSchemaV2.self),
-         .lightweight(fromVersion: AureliaSchemaV2.self, toVersion: AureliaSchemaV3.self)]
+         .lightweight(fromVersion: AureliaSchemaV2.self, toVersion: AureliaSchemaV3.self),
+         .lightweight(fromVersion: AureliaSchemaV3.self, toVersion: AureliaSchemaV4.self)]
     }
 }
 
 // MARK: - Containers
 
 enum Persistence {
-    static let schema = Schema(versionedSchema: AureliaSchemaV3.self)
+    static let schema = Schema(versionedSchema: AureliaSchemaV4.self)
 
     /// A human-readable version string, recorded in every export.
     static var schemaVersionString: String {
-        let v = AureliaSchemaV3.versionIdentifier
+        let v = AureliaSchemaV4.versionIdentifier
         return "\(v.major).\(v.minor).\(v.patch)"
     }
 
