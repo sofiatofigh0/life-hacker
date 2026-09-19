@@ -42,7 +42,36 @@ import SwiftData
 }
 @Model final class TemplateEntity {
     var name: String; var weekday: Int; var exerciseNames: [String]; var defaultSets: Int; var repRange: String
+    /// Per-exercise overrides, parallel to `exerciseNames`. Missing entries fall
+    /// back to `defaultSets` / `repRange`. Edit through the helpers below so
+    /// the three arrays stay aligned.
+    var setCounts: [Int] = []
+    var repRanges: [String] = []
     init(name: String, weekday: Int = 0, exerciseNames: [String] = [], defaultSets: Int = 3, repRange: String = "8–12") { self.name = name; self.weekday = weekday; self.exerciseNames = exerciseNames; self.defaultSets = defaultSets; self.repRange = repRange }
+
+    func sets(at index: Int) -> Int { setCounts.indices.contains(index) && setCounts[index] > 0 ? setCounts[index] : defaultSets }
+    func reps(at index: Int) -> String { repRanges.indices.contains(index) && !repRanges[index].isEmpty ? repRanges[index] : repRange }
+    func sets(for exerciseName: String) -> Int { exerciseNames.firstIndex(of: exerciseName).map(sets(at:)) ?? defaultSets }
+    func reps(for exerciseName: String) -> String { exerciseNames.firstIndex(of: exerciseName).map(reps(at:)) ?? repRange }
+
+    private func align() {
+        while setCounts.count < exerciseNames.count { setCounts.append(0) }
+        while repRanges.count < exerciseNames.count { repRanges.append("") }
+        if setCounts.count > exerciseNames.count { setCounts.removeLast(setCounts.count - exerciseNames.count) }
+        if repRanges.count > exerciseNames.count { repRanges.removeLast(repRanges.count - exerciseNames.count) }
+    }
+    func append(_ exerciseName: String, sets: Int = 0, reps: String = "") {
+        align(); exerciseNames.append(exerciseName); setCounts.append(sets); repRanges.append(reps)
+    }
+    func remove(atOffsets offsets: IndexSet) {
+        align(); exerciseNames.remove(atOffsets: offsets); setCounts.remove(atOffsets: offsets); repRanges.remove(atOffsets: offsets)
+    }
+    func move(fromOffsets source: IndexSet, toOffset destination: Int) {
+        align(); exerciseNames.move(fromOffsets: source, toOffset: destination)
+        setCounts.move(fromOffsets: source, toOffset: destination); repRanges.move(fromOffsets: source, toOffset: destination)
+    }
+    func setSets(_ count: Int, at index: Int) { align(); guard setCounts.indices.contains(index) else { return }; setCounts[index] = count }
+    func setReps(_ reps: String, at index: Int) { align(); guard repRanges.indices.contains(index) else { return }; repRanges[index] = reps }
 }
 @Model final class WorkoutEntity {
     var date: Date; var name: String; var completed: Bool; var isCardio: Bool; var durationMinutes: Double

@@ -6,8 +6,10 @@ extension WorkoutEntity {
     /// A session created from a template: one exercise per template entry,
     /// each with the template's default number of empty sets.
     static func make(from template: TemplateEntity, date: Date) -> WorkoutEntity {
-        let exercises = template.exerciseNames.enumerated().map { index, name in
-            SessionExerciseEntity(name: name, order: index, sets: (0..<template.defaultSets).map { SetEntity(order: $0) })
+        var exercises: [SessionExerciseEntity] = []
+        for (index, name) in template.exerciseNames.enumerated() {
+            let count = max(1, template.sets(at: index))
+            exercises.append(SessionExerciseEntity(name: name, order: index, sets: (0..<count).map { SetEntity(order: $0) }))
         }
         return WorkoutEntity(date: date, name: template.name, exercises: exercises)
     }
@@ -236,7 +238,12 @@ struct StrengthSessionView: View {
 
     private var units: UnitSystem { profile.units }
     private var orderedExercises: [SessionExerciseEntity] { workout.exercises.sorted { $0.order < $1.order } }
-    private var repRange: String? { templates.first { $0.name == workout.name }?.repRange }
+    private var template: TemplateEntity? { templates.first { $0.name == workout.name } }
+    private func repRange(for exercise: String) -> String? {
+        guard let template, template.exerciseNames.contains(exercise) else { return nil }
+        let reps = template.reps(for: exercise)
+        return reps.isEmpty ? nil : reps
+    }
 
     private var allSets: [SetEntity] { workout.exercises.flatMap(\.sets) }
     private var doneSets: Int { allSets.filter { $0.completed && !$0.isWarmup }.count }
@@ -340,7 +347,7 @@ struct StrengthSessionView: View {
         } header: {
             HStack {
                 Text(exercise.name)
-                if let repRange, !repRange.isEmpty { Text("· \(repRange) reps").foregroundStyle(.secondary) }
+                if let reps = repRange(for: exercise.name) { Text("· \(reps)").foregroundStyle(.secondary) }
                 Spacer()
                 if let last = previous.last {
                     Text("Last: \(units.displayWeight(kilograms: last.weightKG).formatted(.number.precision(.fractionLength(0...1)))) × \(last.reps)")
@@ -754,6 +761,15 @@ struct ExerciseDetail: View {
                     .font(.caption.weight(.semibold)).textCase(.uppercase).tracking(1).foregroundStyle(.secondary)
                 }
                 Text(exercise?.summary ?? "Custom exercise").font(.title3)
+                if let url = demonstrationURL {
+                    Link(destination: url) {
+                        Label("Watch a demonstration", systemImage: "play.rectangle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    Text("Opens a YouTube search for this exercise. Aurelia ships no video of its own.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
 
                 if !history.isEmpty {
                     Text("Your history").font(.headline)
@@ -784,6 +800,13 @@ struct ExerciseDetail: View {
 
     private func weight(_ kg: Double) -> String {
         units.displayWeight(kilograms: kg).formatted(.number.precision(.fractionLength(0...1))) + " " + units.weightUnit
+    }
+
+    /// A search, not a specific video: search results stay current and need no licence.
+    private var demonstrationURL: URL? {
+        var parts = URLComponents(string: "https://www.youtube.com/results")
+        parts?.queryItems = [URLQueryItem(name: "search_query", value: "\(name) exercise how to")]
+        return parts?.url
     }
 
     private func chart(_ points: [HistoryPoint]) -> some View {
@@ -894,6 +917,35 @@ struct TemplateBuilderView: View {
                 }
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+            Section {
+                ForEach(ProgramCatalog.all, id: \.name) { program in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(program.name).font(.headline)
+                        Text(program.summary).font(.footnote).foregroundStyle(.secondary)
+                        Button("Add all \(program.days.count) days") { add(program) }
+                            .buttonStyle(.bordered).controlSize(.small)
+                            .disabled(program.days.allSatisfy { day in templates.contains { $0.name == day.name } })
+                    }
+                    ForEach(program.days, id: \.name) { day in
+                        Button {
+                            add(day)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(day.name)
+                                    Text("\(day.exercises.count) exercises · \(Calendar.current.weekdaySymbols[day.suggestedWeekday - 1])")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: templates.contains { $0.name == day.name } ? "checkmark" : "plus.circle")
+                            }
+                        }
+                        .disabled(templates.contains { $0.name == day.name })
+                    }
+                }
+            } header: { Text("Programs") } footer: {
+                Text("Adding a day creates an editable template with its sets and rep ranges. Change the weekday below if the suggested one doesn't suit.")
+            }
             if templates.isEmpty {
                 Section {
                     Text("Templates become one-tap workouts, and a template scheduled for today appears on the Today tab.")
@@ -908,7 +960,7 @@ struct TemplateBuilderView: View {
                         ForEach(1...7, id: \.self) { Text(Calendar.current.weekdaySymbols[$0 - 1]).tag($0) }
                     }
                     Stepper("Default sets: \(template.defaultSets)", value: Bindable(template).defaultSets, in: 1...10)
-                    LabeledContent("Rep range") {
+                    LabeledContent("Default rep range") {
                         TextField("8–12", text: Bindable(template).repRange).multilineTextAlignment(.trailing)
                     }
                     NavigationLink("Exercises (\(template.exerciseNames.count))") { TemplateExercisesView(template: template) }
@@ -929,10 +981,29 @@ struct TemplateBuilderView: View {
     }
 }
 
+extension TemplateBuilderView {
+    fileprivate func add(_ program: Program) {
+        for day in program.days where !templates.contains(where: { $0.name == day.name }) { add(day) }
+    }
+
+    fileprivate func add(_ day: ProgramDay) {
+        guard !templates.contains(where: { $0.name == day.name }) else { return }
+        // Don't double-book a weekday that already has a template.
+        let taken = Set(templates.map(\.weekday))
+        let template = TemplateEntity(name: day.name, weekday: taken.contains(day.suggestedWeekday) ? 0 : day.suggestedWeekday,
+                                      defaultSets: 3, repRange: "10–12")
+        for exercise in day.exercises { template.append(exercise.name, sets: exercise.sets, reps: exercise.reps) }
+        context.insert(template)
+        try? context.save()
+        Haptics.success()
+    }
+}
+
 struct TemplateExercisesView: View {
     @Environment(\.modelContext) private var context
     let template: TemplateEntity
     @State private var picker = false
+    @State private var editingIndex: Int?
 
     var body: some View {
         List {
@@ -940,21 +1011,78 @@ struct TemplateExercisesView: View {
                 if template.exerciseNames.isEmpty {
                     Text("No exercises yet").foregroundStyle(.secondary)
                 }
-                ForEach(template.exerciseNames, id: \.self) { Text($0) }
-                    .onDelete { template.exerciseNames.remove(atOffsets: $0); try? context.save() }
-                    .onMove { template.exerciseNames.move(fromOffsets: $0, toOffset: $1); try? context.save() }
+                ForEach(Array(template.exerciseNames.enumerated()), id: \.offset) { pair in
+                    Button { editingIndex = pair.offset } label: {
+                        HStack {
+                            Text(pair.element).foregroundStyle(.primary)
+                            Spacer()
+                            Text("\(template.sets(at: pair.offset)) × \(template.reps(at: pair.offset))").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .onDelete { template.remove(atOffsets: $0); try? context.save() }
+                .onMove { template.move(fromOffsets: $0, toOffset: $1); try? context.save() }
             }
             Section {
                 Button { picker = true } label: { Label("Add exercise", systemImage: "plus") }
+            } footer: {
+                Text("Tap an exercise to set its sets and rep range. Blank ones use the template defaults.")
             }
         }
         .toolbar { EditButton() }
         .navigationTitle(template.name)
         .sheet(isPresented: $picker) {
             ExercisePicker(exclude: Set(template.exerciseNames)) { name in
-                template.exerciseNames.append(name)
+                template.append(name)
                 try? context.save()
                 picker = false
+            }
+        }
+        .sheet(item: Binding(get: { editingIndex.map { IndexBox(index: $0) } }, set: { editingIndex = $0?.index })) { box in
+            TemplateExerciseEditor(template: template, index: box.index)
+        }
+    }
+
+    private struct IndexBox: Identifiable { let index: Int; var id: Int { index } }
+}
+
+/// Sets and rep range for one exercise in a template.
+struct TemplateExerciseEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    let template: TemplateEntity
+    let index: Int
+    @State private var sets: Int
+    @State private var reps: String
+
+    init(template: TemplateEntity, index: Int) {
+        self.template = template; self.index = index
+        _sets = State(initialValue: template.sets(at: index))
+        _reps = State(initialValue: template.reps(at: index))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(template.exerciseNames.indices.contains(index) ? template.exerciseNames[index] : "Exercise") {
+                    Stepper("Sets: \(sets)", value: $sets, in: 1...10)
+                    LabeledContent("Reps or time") {
+                        TextField("8–12", text: $reps).multilineTextAlignment(.trailing)
+                    }
+                }
+            }
+            .navigationTitle("Sets & Reps")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        template.setSets(sets, at: index)
+                        template.setReps(reps.trimmingCharacters(in: .whitespaces), at: index)
+                        try? context.save()
+                        dismiss()
+                    }
+                }
             }
         }
     }

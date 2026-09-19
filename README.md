@@ -8,7 +8,7 @@ and sage interface is designed as a calm daily command center — not a gamified
 
 | Layer | State | Verified how |
 |---|---|---|
-| `WellnessCore` business logic, unit handling, export format, catalogs, insights | Working | `swift test` — 49/49 pass |
+| `WellnessCore` business logic, unit handling, export format, catalogs, insights | Working | `swift test` — 52/52 pass |
 | SwiftUI app sources | Parse clean, Swift 5 mode | `swiftc -parse` on every file |
 | Xcode project, scheme, asset catalog | Present and internally consistent | reference-integrity check |
 | Simulator build | Succeeded once (before the audit rewrite) | Xcode 26 on a Mac |
@@ -18,7 +18,7 @@ The app has been through a full-screen audit and a product-review pass (see
 [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for the register and [`PRODUCT_REVIEW.md`](PRODUCT_REVIEW.md) for the
 walkthrough, the competitive comparison, and the fix list). Both rewrote most of the view layer; the code
 parses cleanly but the next ⌘R is its first real type check. Expect a round of diagnostics, as with every
-change so far. **This build migrates the data store from schema V1 to V2 on first launch.**
+change so far. **This build migrates the data store to schema V3 on first launch** (V2 added set logging, V3 per-exercise sets and rep ranges in templates).
 
 ## What is implemented
 
@@ -26,8 +26,9 @@ change so far. **This build migrates the data store from schema V1 to V2 on firs
 - Today checklist with a greeting, remaining-calorie framing, progress bars, a streak, and a centralized
   completion score for workouts, calorie consistency (90–110%), protein, steps, water, and supplements.
   Active calories never increase the food target. The screen rolls over at midnight.
-- Recurring workout templates with weekday assignment, exercise search/reordering, default sets and rep
-  range, and one-tap repeat of any past session.
+- Recurring workout templates with weekday assignment, exercise search/reordering, per-exercise sets and
+  rep ranges, one-tap repeat of any past session, and a built-in five-day glutes-and-posture program that
+  can be added as templates.
 - Strength sessions the way Strong and Hevy do them: last time's numbers as placeholders, tick a set to
   complete it (adopting those numbers), a rest timer pinned to the bottom that notifies you when the phone is
   locked, PR badges, warm-up and RPE per set, per-exercise notes, and a session summary (volume, sets,
@@ -48,7 +49,8 @@ change so far. **This build migrates the data store from schema V1 to V2 on firs
   build's demo mode wrote into the real database.
 - Versioned SwiftData schema with a migration plan, a store that never self-deletes on failure, and
   JSON **export and restore** of every record from Settings.
-- A ~170-exercise library (grouped by muscle group and equipment, with form cues) and ~130 built-in food
+- A ~190-exercise library (grouped by muscle group and equipment, including mobility and posture work,
+  with form cues and a link to a video demonstration search) and ~130 built-in food
   staples, both kept as code and merged into the store by name on launch — so they can grow in any update
   without touching your data. A Food Library screen lets you edit, favorite, and delete saved foods.
 
@@ -61,7 +63,8 @@ Your logs live in one SwiftData database inside the app's container. They surviv
 2. **You install over the top** — ⌘R from Xcode, or a rebuild after the 7-day free-team expiry. Never
    delete the app to "reinstall cleanly"; that deletes the database and the photos.
 3. **Model changes go through the migration plan** in `Aurelia/Persistence.swift`. Schema V1 is frozen
-   there and V2 (set completion, warm-up, RPE, exercise notes) migrates from it automatically. Content that
+   there, V2 (set completion, warm-up, RPE, exercise notes) and V3 (per-exercise sets and reps in
+   templates) migrate from it automatically. Content that
    only needs to grow — the exercise and food catalogs — is code, not schema, precisely so updates don't
    migrate anything. If a store ever fails to open, the orange banner offers **Start fresh**, which erases
    it only after you confirm; the app never deletes data on its own.

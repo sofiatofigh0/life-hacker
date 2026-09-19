@@ -50,7 +50,10 @@ enum ImportService {
             context.insert(profile)
         }
         for t in export.templates {
-            context.insert(TemplateEntity(name: t.name, weekday: t.weekday, exerciseNames: t.exerciseNames, defaultSets: t.defaultSets, repRange: t.repRange))
+            let template = TemplateEntity(name: t.name, weekday: t.weekday, exerciseNames: t.exerciseNames, defaultSets: t.defaultSets, repRange: t.repRange)
+            template.setCounts = t.setCounts ?? []
+            template.repRanges = t.repRanges ?? []
+            context.insert(template)
         }
         for w in export.workouts {
             let exercises = w.exercises.enumerated().map { index, exercise in

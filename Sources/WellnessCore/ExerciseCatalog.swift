@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Types
 
 public enum MuscleGroup: String, CaseIterable, Codable, Sendable {
-    case chest, back, shoulders, biceps, triceps, forearms, quads, hamstrings, glutes, calves, core, fullBody
+    case chest, back, shoulders, biceps, triceps, forearms, quads, hamstrings, glutes, calves, core, fullBody, mobility
 
     public var label: String {
         switch self {
@@ -19,6 +19,7 @@ public enum MuscleGroup: String, CaseIterable, Codable, Sendable {
         case .calves: return "Calves"
         case .core: return "Core"
         case .fullBody: return "Full body"
+        case .mobility: return "Mobility & posture"
         }
     }
 }
@@ -127,6 +128,8 @@ public enum ExerciseCatalog {
           "Chest on the pad if there is one", "Squeeze shoulder blades at the top"),
         e("Lat Pulldown", .back, .cable, "Vertical back pull.",
           "Drive elbows down and back", "Bar to the upper chest", "Lean back only slightly"),
+        e("Neutral-Grip Lat Pulldown", .back, .cable, "Pulldown with palms facing each other; easier on the shoulders and strong for the lats.",
+          "Pull the elbows down toward the back pockets", "Chest up, slight lean back, no swinging", "Pause a beat at the bottom"),
         e("Close-Grip Lat Pulldown", .back, .cable, "V-handle pulldown for a longer lat stretch.",
           "Let the lats stretch fully at the top", "Pull to the sternum"),
         e("Straight-Arm Pulldown", .back, .cable, "Lat isolation with locked elbows.",
@@ -184,6 +187,12 @@ public enum ExerciseCatalog {
           "Raise to eye level", "Alternate arms to reduce swinging"),
         e("Rear Delt Fly", .shoulders, .dumbbell, "Bent-over fly for the rear delts.",
           "Hinge to near-parallel", "Lead with the pinkies", "Light weight — the rear delts are small"),
+        e("Cable Y-Raise", .shoulders, .cable, "Arms raised in a Y from a low cable; lower traps and rear delts for posture.",
+          "Thumbs up, arms about 30° out from straight ahead", "Lead with the shoulder blades, not the hands", "Very light — 5–10 lb a side is plenty"),
+        e("Band External Rotation", .shoulders, .band, "Rotator-cuff warm-up: elbow pinned at the side, rotate the forearm outward.",
+          "Keep the elbow glued to your ribs", "Slow out, slow back", "Stop before the shoulder rolls forward"),
+        e("Arm Circles", .shoulders, .bodyweight, "Shoulder warm-up: straight-arm circles forward, then backward.",
+          "Start small and grow the circle", "Ten each direction is enough", "Keep the ribs down"),
         e("Reverse Pec Deck", .shoulders, .machine, "Machine rear-delt fly.",
           "Handles at shoulder height", "Squeeze between the shoulder blades"),
         e("Upright Row", .shoulders, .barbell, "Vertical pull to the chest for side delts and traps.",
@@ -242,6 +251,8 @@ public enum ExerciseCatalog {
           "Pull the rope apart at the bottom", "Elbows stay at the ribs"),
         e("Overhead Cable Extension", .triceps, .cable, "Overhead extension for the long head.",
           "Elbows point forward", "Full stretch behind the head"),
+        e("Cross-Body Cable Triceps Extension", .triceps, .cable, "One-arm extension across the body from a high cable; long head with a hard contraction.",
+          "Set the cable high, grab with the far hand", "Pin the elbow in place and extend across", "Light weight, 12–15 reps"),
         e("Skull Crusher", .triceps, .barbell, "Lying extension to the forehead or behind the head.",
           "Lower behind the head for a bigger stretch", "Elbows stay pointed to the ceiling", "Use an EZ bar if the wrists complain"),
         e("Close-Grip Bench Press", .triceps, .barbell, "Bench press with a narrow grip.",
@@ -286,6 +297,8 @@ public enum ExerciseCatalog {
           "Elbows high the whole way", "Sit straight down between the heels"),
         e("Leg Press", .quads, .machine, "Machine compound leg press.",
           "Keep hips planted", "Track knees over toes", "Don't lock the knees at the top"),
+        e("Single-Leg Leg Press", .quads, .machine, "One leg at a time on the leg press; evens out imbalances and spares the lower back.",
+          "Foot mid-to-high on the platform for more glute", "Only as deep as the hips stay flat on the pad", "Control the sled — never lock the knee"),
         e("Hack Squat", .quads, .machine, "Angled machine squat; heavy quad loading with back support.",
           "Feet lower on the platform for more quads", "Full depth if the knees allow"),
         e("Leg Extension", .quads, .machine, "Machine quadriceps isolation.",
@@ -321,6 +334,8 @@ public enum ExerciseCatalog {
           "Push hips back", "Keep the bar close", "Soft knees, flat back", "Stop when the hamstrings say stop"),
         e("Dumbbell Romanian Deadlift", .hamstrings, .dumbbell, "RDL with dumbbells at the sides.",
           "Weights slide down the thighs", "Feel the stretch, then drive the hips forward"),
+        e("Cable Romanian Deadlift", .hamstrings, .cable, "Hip hinge facing a low cable; constant tension through the whole range.",
+          "Step back so the cable is taut at the top", "Push the hips back, soft knees, flat back", "Squeeze the glutes to stand"),
         e("Single-Leg Romanian Deadlift", .hamstrings, .dumbbell, "One-leg hinge; balance and hamstrings.",
           "Hips square to the floor", "Reach the free leg straight back"),
         e("Stiff-Leg Deadlift", .hamstrings, .barbell, "Straighter-leg hinge for more hamstring stretch.",
@@ -356,6 +371,12 @@ public enum ExerciseCatalog {
           "Control the return", "Lean forward slightly for more glute", "Pause at the widest point"),
         e("Cable Kickback", .glutes, .cable, "Straight-leg extension behind you against a cable.",
           "Hinge slightly forward", "Squeeze at the back, don't arch the spine"),
+        e("Cable Diagonal Kickback", .glutes, .cable, "Kickback angled out and back; targets the upper and side glute.",
+          "Stand at 45° to the machine", "Drive the leg back and out, toes slightly turned out", "Keep the standing leg and torso still"),
+        e("Glute-Biased Back Extension", .glutes, .bodyweight, "45° back extension with a rounded upper back and tucked chin so the glutes do the work.",
+          "Round the upper back slightly and keep it rounded", "Toes turned out, squeeze the glutes hard at the top", "Stop just short of full lockout"),
+        e("Glute Bridge Pulse", .glutes, .bodyweight, "Short pulses at the top of a glute bridge; a finisher for the pump.",
+          "Stay near the top of the bridge", "Small, fast, squeeze every rep", "Twenty is a set"),
         e("Cable Hip Abduction", .glutes, .cable, "Standing abduction with an ankle cuff.",
           "Stand tall, hold the machine", "Small, controlled range"),
         e("Sumo Squat", .glutes, .dumbbell, "Wide-stance squat holding one dumbbell.",
@@ -479,8 +500,31 @@ public enum ExerciseCatalog {
           "Elbows inside the knees", "Chest up"),
     ]
 
+    static let mobility: [ExerciseDefinition] = [
+        e("Wall Slide", .mobility, .bodyweight, "Back against a wall, forearms on the wall, slide the arms up and down; opens the shoulders and trains upright posture.",
+          "Low back, shoulders, elbows and wrists all touch the wall", "Slide up only as far as they stay in contact", "Ten slow reps"),
+        e("Doorway Pec Stretch", .mobility, .bodyweight, "Forearms on a doorframe, step through gently to stretch the chest.",
+          "Elbows at shoulder height", "Lean until you feel a stretch, not pain", "30–45 seconds, breathe"),
+        e("Chin Tuck", .mobility, .bodyweight, "Draw the chin straight back to make a double chin; strengthens the deep neck flexors for head posture.",
+          "Eyes stay level — it is a glide, not a nod", "Hold 3 seconds", "Ten reps, no strain"),
+        e("Bodyweight Hip Hinge", .mobility, .bodyweight, "The hinge pattern with no load: hips back, flat back, shins vertical.",
+          "A dowel along the spine should touch head, upper back and tailbone", "Feel the hamstrings stretch", "Stand by squeezing the glutes"),
+        e("Cat-Cow", .mobility, .bodyweight, "On all fours, alternate rounding and arching the spine.",
+          "Move one vertebra at a time", "Exhale to round, inhale to arch", "Ten slow cycles"),
+        e("Thoracic Rotation", .mobility, .bodyweight, "On all fours or side-lying, rotate the upper back open toward the ceiling.",
+          "Hips stay still — the movement is above the ribs", "Follow the hand with your eyes", "Eight each side"),
+        e("Hip Flexor Stretch", .mobility, .bodyweight, "Half-kneeling, tuck the pelvis and shift forward to stretch the front of the hip.",
+          "Squeeze the glute of the back leg", "Ribs down; don't arch the low back", "30–45 seconds each side"),
+        e("90/90 Hip Stretch", .mobility, .bodyweight, "Seated with both knees at 90°, lean over the front shin, then switch.",
+          "Sit tall before you lean", "Move from the hips, not the back", "30 seconds each side"),
+        e("Hamstring Stretch", .mobility, .bodyweight, "Heel on a low step, hinge forward with a flat back.",
+          "Keep the knee soft", "Hinge from the hips", "30 seconds each side"),
+        e("Glute Activation Circuit", .mobility, .band, "Two or three minutes of bridges, clamshells and banded walks before a lower-body session.",
+          "Light band, high reps", "Feel the glutes, not the low back", "Warm, not tired"),
+    ]
+
     public static let all: [ExerciseDefinition] =
-        chest + back + shoulders + biceps + triceps + forearms + quads + hamstrings + glutes + calves + core + fullBody
+        chest + back + shoulders + biceps + triceps + forearms + quads + hamstrings + glutes + calves + core + fullBody + mobility
 
     public static let byName: [String: ExerciseDefinition] = {
         var map = [String: ExerciseDefinition]()

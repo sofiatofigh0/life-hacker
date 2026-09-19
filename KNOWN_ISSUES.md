@@ -13,6 +13,16 @@ and includes the first real schema migration (V1 → V2).
 
 ---
 
+## Added after the product-review pass
+
+| # | Item |
+|---|---|
+| P1 | **Schema V3.** `TemplateEntity` gains per-exercise `setCounts` and `repRanges` (parallel to `exerciseNames`, edited through helpers). V2's template shape is frozen in `Persistence.swift`; lightweight stage V2 → V3. |
+| P2 | **Programs.** `ProgramCatalog` (WellnessCore) holds the five-day glutes-and-posture plan. Workout → Weekly schedule → Programs adds any day, or all five, as editable templates with the plan's sets and rep ranges and a suggested weekday. |
+| P3 | Exercise library: new **Mobility & posture** group (wall slides, doorway pec stretch, chin tucks, hip hinge, cat-cow, thoracic rotation, hip flexor / 90-90 / hamstring stretches, glute activation) and the plan's missing lifts (cable Y-raise, band external rotation, arm circles, neutral-grip pulldown, cross-body triceps extension, single-leg leg press, cable RDL, cable diagonal kickback, glute-biased back extension, glute bridge pulse). |
+| P4 | Exercise page: **Watch a demonstration** opens a YouTube search for the exercise. The app ships no video: licensed demonstration clips are still X11. |
+| P5 | Apple Health: Settings now reports *why* it looks disconnected — the permission sheet never shown (build lacks the HealthKit capability), permission granted but no data (categories off in the Health app), or the real error — with an "Open the Health app" button. |
+
 ## Added in the product-review pass
 
 | # | Item |

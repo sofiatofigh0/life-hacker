@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import UIKit
 
 /// Reminder preferences live in UserDefaults; the scheduled notifications are
 /// derived from them plus the templates, so both Settings and the schedule
@@ -91,7 +92,10 @@ struct SettingsView: View {
         } message: { export in
             Text("Backup from \(export.exportedAt.formatted(date: .abbreviated, time: .shortened)). Everything currently in the app will be removed first. Export a copy of the current data before you do this if you might want it back.")
         }
-        .task { photoReminderOn = await NotificationService.isWeeklyPhotoScheduled() }
+        .task {
+            photoReminderOn = await NotificationService.isWeeklyPhotoScheduled()
+            if sync.isAvailable && !demo.isEnabled { await sync.refreshDiagnosis() }
+        }
         .alert("Old demo data", isPresented: Binding(get: { cleanupReport != nil }, set: { if !$0 { cleanupReport = nil } }),
                presenting: cleanupReport) { report in
             if report.total > 0 {
@@ -221,7 +225,16 @@ struct SettingsView: View {
                 .disabled(sync.isSyncing)
                 if let error = sync.lastError {
                     Text(error).font(.footnote).foregroundStyle(.red)
-                } else if let last = sync.lastSynced {
+                }
+                if let diagnosis = sync.diagnosis {
+                    Text(diagnosis).font(.footnote).foregroundStyle(.orange)
+                }
+                if sync.permissionAsked == true {
+                    Button {
+                        if let url = URL(string: "x-apple-health://") { UIApplication.shared.open(url) }
+                    } label: { Label("Open the Health app", systemImage: "arrow.up.forward.app") }
+                }
+                if sync.lastError == nil, sync.diagnosis == nil, let last = sync.lastSynced {
                     Text("Last synced \(last.formatted(date: .omitted, time: .shortened)). Runs automatically when the app opens.")
                         .font(.footnote).foregroundStyle(.secondary)
                 } else {
@@ -231,7 +244,7 @@ struct SettingsView: View {
             }
         } header: { Text("Apple Health") } footer: {
             if sync.isAvailable && !demo.isEnabled {
-                Text("If steps stay at zero after connecting, open the Health app → Sharing → Apps → Aurelia and turn on the categories.")
+                Text("Tap Connect / Refresh and the line above says exactly where things stand. If steps stay at zero after granting access, open the Health app → your picture → Apps → Aurelia and turn the categories on.")
             }
         }
     }

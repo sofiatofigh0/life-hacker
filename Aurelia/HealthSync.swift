@@ -30,11 +30,52 @@ final class HealthSync {
 
     var isAvailable: Bool { HealthKitService.isAvailable }
 
+    /// Plain-language state of the connection, refreshed after every attempt.
+    private(set) var diagnosis: String?
+    private(set) var permissionAsked: Bool?
+
     func requestAccessAndSync(context: ModelContext) async {
+        diagnosis = nil
         do { try await service.authorize() }
-        catch { lastError = error.localizedDescription; Haptics.warning(); return }
+        catch {
+            lastError = Self.explain(error)
+            Haptics.warning()
+            await refreshDiagnosis()
+            return
+        }
         await sync(context: context)
+        await refreshDiagnosis()
         if lastError == nil { Haptics.success() } else { Haptics.warning() }
+    }
+
+    /// Works out why Health might look "not connected" and says so.
+    func refreshDiagnosis() async {
+        let state = await service.permissionState()
+        switch state {
+        case .unavailable:
+            permissionAsked = nil
+            diagnosis = "Apple Health is not available on this device."
+        case .notAsked:
+            permissionAsked = false
+            diagnosis = "iOS never showed the Health permission sheet. This build is missing the HealthKit capability: in Xcode select the Aurelia target → Signing & Capabilities → + Capability → HealthKit, then run again."
+        case .asked:
+            permissionAsked = true
+            if lastError != nil {
+                diagnosis = nil
+            } else if !hasEverReceivedData {
+                diagnosis = "Permission was requested, but Health returned no steps, energy, heart rate or weight for the last 14 days. Open the Health app → your picture → Apps → Aurelia and turn the categories on, or check that the iPhone/Watch is recording steps at all."
+            } else {
+                diagnosis = nil
+            }
+        }
+    }
+
+    private static func explain(_ error: Error) -> String {
+        let text = error.localizedDescription
+        if text.localizedCaseInsensitiveContains("entitlement") {
+            return "The build has no HealthKit entitlement. In Xcode: Aurelia target → Signing & Capabilities → + Capability → HealthKit."
+        }
+        return text
     }
 
     /// Imports the last `days` days (today inclusive).

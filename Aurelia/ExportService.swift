@@ -42,7 +42,7 @@ enum ExportService {
             profile: profile,
             templates: try all(TemplateEntity.self).map {
                 TemplateRecord(name: $0.name, weekday: $0.weekday, exerciseNames: $0.exerciseNames,
-                               defaultSets: $0.defaultSets, repRange: $0.repRange)
+                               defaultSets: $0.defaultSets, repRange: $0.repRange, setCounts: $0.setCounts, repRanges: $0.repRanges)
             },
             workouts: workouts,
             foods: try all(FoodEntity.self).map {

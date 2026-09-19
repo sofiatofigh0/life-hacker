@@ -130,10 +130,37 @@ actor HealthKitService: HealthProviding {
 
     func authorize() async throws {
         guard HKHealthStore.isHealthDataAvailable() else { return }
+        try await store.requestAuthorization(toShare: Self.shareTypes, read: Self.readTypes)
+    }
+
+    /// Everything the app may ask for, in one place so the request and the
+    /// status check always agree.
+    private static var readTypes: Set<HKObjectType> {
         let ids: [HKQuantityTypeIdentifier] = [.stepCount, .activeEnergyBurned, .basalEnergyBurned, .heartRate, .bodyMass, .distanceWalkingRunning]
-        let read = Set(ids.compactMap(HKObjectType.quantityType(forIdentifier:))).union([HKObjectType.workoutType()])
-        let share = Set([HKObjectType.quantityType(forIdentifier: .bodyMass)].compactMap { $0 })
-        try await store.requestAuthorization(toShare: share, read: read)
+        return Set(ids.compactMap(HKObjectType.quantityType(forIdentifier:))).union([HKObjectType.workoutType()])
+    }
+    private static var shareTypes: Set<HKSampleType> {
+        Set([HKObjectType.quantityType(forIdentifier: .bodyMass)].compactMap { $0 })
+    }
+
+    enum PermissionState: Equatable {
+        /// The system sheet has never been shown (or could not be shown).
+        case notAsked
+        /// The sheet was shown; the user chose something. Read grants are never revealed.
+        case asked
+        case unavailable
+    }
+
+    /// Whether iOS still needs to show the permission sheet. This is the one
+    /// signal HealthKit gives about *read* permissions: if it says the sheet
+    /// is still needed after we asked, the request never reached the user.
+    func permissionState() async -> PermissionState {
+        guard HKHealthStore.isHealthDataAvailable() else { return .unavailable }
+        return await withCheckedContinuation { continuation in
+            store.getRequestStatusForAuthorization(toShare: Self.shareTypes, read: Self.readTypes) { status, _ in
+                continuation.resume(returning: status == .shouldRequest ? .notAsked : .asked)
+            }
+        }
     }
 
     /// Whether the app has been granted permission to *write* body mass.

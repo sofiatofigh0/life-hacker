@@ -112,9 +112,11 @@ public struct ProfileRecord: Codable, Equatable, Sendable {
 
 public struct TemplateRecord: Codable, Equatable, Sendable {
     public var name: String, weekday: Int, exerciseNames: [String], defaultSets: Int, repRange: String
-    public init(name: String, weekday: Int, exerciseNames: [String], defaultSets: Int, repRange: String) {
+    public var setCounts: [Int]?, repRanges: [String]?
+    public init(name: String, weekday: Int, exerciseNames: [String], defaultSets: Int, repRange: String,
+                setCounts: [Int]? = nil, repRanges: [String]? = nil) {
         self.name = name; self.weekday = weekday; self.exerciseNames = exerciseNames
-        self.defaultSets = defaultSets; self.repRange = repRange
+        self.defaultSets = defaultSets; self.repRange = repRange; self.setCounts = setCounts; self.repRanges = repRanges
     }
 }
 

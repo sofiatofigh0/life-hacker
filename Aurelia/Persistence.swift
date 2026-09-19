@@ -12,7 +12,7 @@ enum AureliaSchemaV1: VersionedSchema {
     static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
-        [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
+        [AppProfile.self, ExerciseEntity.self, AureliaSchemaV2.TemplateEntity.self, WorkoutEntity.self,
          SessionExerciseEntity.self, SetEntity.self, FoodEntity.self, FoodLogEntity.self,
          SavedMealEntity.self, WaterEntity.self, SupplementEntity.self, SupplementCheckEntity.self,
          WeightEntity.self, ActivityEntity.self, PhotoSetEntity.self]
@@ -45,13 +45,32 @@ enum AureliaSchemaV1: VersionedSchema {
     }
 }
 
-/// Version 2 (current). Changes from V1, all additive or removals that
-/// lightweight migration handles:
+/// Version 2. Changes from V1, all handled by lightweight migration:
 /// - `SetEntity`: + `completed`, `isWarmup`, `rpe`, inverse `exercise`
 /// - `SessionExerciseEntity`: + `notes`, inverse `workout`
 /// - `AppProfile`: − `demoMode` (demo mode lives in UserDefaults)
+///
+/// `TemplateEntity` changed in V3, so its V2 shape is frozen here. Never edit.
 enum AureliaSchemaV2: VersionedSchema {
     static var versionIdentifier: Schema.Version { Schema.Version(2, 0, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
+         SessionExerciseEntity.self, SetEntity.self, FoodEntity.self, FoodLogEntity.self,
+         SavedMealEntity.self, WaterEntity.self, SupplementEntity.self, SupplementCheckEntity.self,
+         WeightEntity.self, ActivityEntity.self, PhotoSetEntity.self]
+    }
+
+    @Model final class TemplateEntity {
+        var name: String; var weekday: Int; var exerciseNames: [String]; var defaultSets: Int; var repRange: String
+        init() { name = ""; weekday = 0; exerciseNames = []; defaultSets = 3; repRange = "8–12" }
+    }
+}
+
+/// Version 3 (current). Changes from V2:
+/// - `TemplateEntity`: + `setCounts: [Int]`, `repRanges: [String]` (per-exercise overrides)
+enum AureliaSchemaV3: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(3, 0, 0) }
 
     static var models: [any PersistentModel.Type] {
         [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
@@ -64,26 +83,27 @@ enum AureliaSchemaV2: VersionedSchema {
 /// The ordered history of schema versions. SwiftData walks this to bring an
 /// older store forward to the current one.
 ///
-/// **Adding V3:** freeze the V2 shapes of any model you change into
-/// `AureliaSchemaV2` (as V1 does above), define V3 with the new shapes, append
-/// it to `schemas`, and add a stage. Additive changes are `.lightweight`;
+/// **Adding V4:** freeze the V3 shapes of any model you change into
+/// `AureliaSchemaV3` (as V1 and V2 do above), define V4 with the new shapes,
+/// append it to `schemas`, and add a stage. Additive changes are `.lightweight`;
 /// renames, type changes, and required fields without defaults need `.custom`.
 enum AureliaMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self, AureliaSchemaV2.self] }
+    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self, AureliaSchemaV2.self, AureliaSchemaV3.self] }
 
     static var stages: [MigrationStage] {
-        [.lightweight(fromVersion: AureliaSchemaV1.self, toVersion: AureliaSchemaV2.self)]
+        [.lightweight(fromVersion: AureliaSchemaV1.self, toVersion: AureliaSchemaV2.self),
+         .lightweight(fromVersion: AureliaSchemaV2.self, toVersion: AureliaSchemaV3.self)]
     }
 }
 
 // MARK: - Containers
 
 enum Persistence {
-    static let schema = Schema(versionedSchema: AureliaSchemaV2.self)
+    static let schema = Schema(versionedSchema: AureliaSchemaV3.self)
 
     /// A human-readable version string, recorded in every export.
     static var schemaVersionString: String {
-        let v = AureliaSchemaV2.versionIdentifier
+        let v = AureliaSchemaV3.versionIdentifier
         return "\(v.major).\(v.minor).\(v.patch)"
     }
 
