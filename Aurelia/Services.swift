@@ -184,7 +184,7 @@ actor HealthKitService: HealthProviding {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: HKQuery.predicateForSamples(withStart: start, end: end),
                                           options: .discreteAverage) { _, result, error in
-                if let error { continuation.resume(throwing: error); return }
+                if let error, !Self.isNoData(error) { continuation.resume(throwing: error); return }
                 let bpm = result?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
                 continuation.resume(returning: bpm)
             }
@@ -228,11 +228,19 @@ actor HealthKitService: HealthProviding {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: HKQuery.predicateForSamples(withStart: start, end: end),
                                           options: .cumulativeSum) { _, result, error in
-                if let error { continuation.resume(throwing: error) }
+                if let error, !Self.isNoData(error) { continuation.resume(throwing: error) }
                 else { continuation.resume(returning: result?.sumQuantity()?.doubleValue(for: unit) ?? 0) }
             }
             store.execute(query)
         }
+    }
+
+    /// A statistics query with no matching samples completes with
+    /// `HKError.errorNoData` ("No data available for the specified predicate")
+    /// instead of an empty result. That is "zero", not a failure: a day with
+    /// no resting-energy samples must not abort the whole sync.
+    private static func isNoData(_ error: Error) -> Bool {
+        (error as? HKError)?.code == .errorNoData || (error as NSError).code == HKError.Code.errorNoData.rawValue
     }
 
     private static func dayBounds(_ date: Date) -> (Date, Date) {

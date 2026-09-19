@@ -63,7 +63,7 @@ final class HealthSync {
             if lastError != nil {
                 diagnosis = nil
             } else if !hasEverReceivedData {
-                diagnosis = "Permission was requested, but Health returned no steps, energy, heart rate or weight for the last 14 days. Open the Health app → your picture → Apps → Aurelia and turn the categories on, or check that the iPhone/Watch is recording steps at all."
+                diagnosis = "Permission was requested, but Health returned no steps, energy, heart rate or weight for the last 14 days. In the Health app, check your picture → Apps → Aurelia has the categories on, and that the iPhone is recording steps at all."
             } else {
                 diagnosis = nil
             }
