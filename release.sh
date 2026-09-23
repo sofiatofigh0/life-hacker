@@ -19,10 +19,13 @@ TEAM=$(sed -n 's/^DEVELOPMENT_TEAM *= *//p' Config/Secrets.xcconfig | tr -d '[:s
 BUNDLE=$(sed -n 's/^PRODUCT_BUNDLE_IDENTIFIER *= *//p' Config/Secrets.xcconfig | tr -d '[:space:]')
 case "$BUNDLE" in ""|com.example.*) die "Set a real PRODUCT_BUNDLE_IDENTIFIER in Config/Secrets.xcconfig.";; esac
 
-if ! git diff --quiet -- . ':!Aurelia.xcodeproj/project.pbxproj' || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-  die "Commit or stash your changes first; a TestFlight build should match a commit."
+# Xcode rewrites these on its own; drop its edits, the same as update.sh does.
+git checkout -- Aurelia.xcodeproj/project.pbxproj Aurelia/Info.plist 2>/dev/null || true
+if ! git diff --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+  echo "These files differ from the last commit:" >&2
+  git status --short >&2
+  die "Commit or stash them first; a TestFlight build should match a commit."
 fi
-git checkout -- Aurelia.xcodeproj/project.pbxproj 2>/dev/null || true
 
 # --- Version and build number -----------------------------------------------
 VERSION_FILE=Config/Version.xcconfig
