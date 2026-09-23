@@ -2,4 +2,4 @@
 // Connect uses to tell uploads apart (CURRENT_PROJECT_VERSION). Every upload
 // needs a higher build number; ./release.sh bumps it and commits this file.
 MARKETING_VERSION = 1.0
-CURRENT_PROJECT_VERSION = 2
+CURRENT_PROJECT_VERSION = 3
