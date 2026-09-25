@@ -73,6 +73,10 @@ enum ExportService {
             },
             customExercises: try all(ExerciseEntity.self).filter(\.isCustom).map {
                 CustomExerciseRecord(name: $0.name, summary: $0.summary, tips: $0.tips.components(separatedBy: "\n"))
+            },
+            reminders: try all(ReminderEntity.self).map {
+                ReminderRecord(title: $0.title, kind: $0.kind, minutesOfDay: $0.minutesOfDay, endMinutesOfDay: $0.endMinutesOfDay,
+                               intervalMinutes: $0.intervalMinutes, weekdays: $0.weekdays, enabled: $0.enabled)
             })
     }
 

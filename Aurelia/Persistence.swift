@@ -100,7 +100,7 @@ enum AureliaSchemaV3: VersionedSchema {
     }
 }
 
-/// Version 4 (current). Changes from V3:
+/// Version 4. Changes from V3:
 /// - `WorkoutEntity`: + `externalID` (Apple Health import de-duplication)
 /// - `SessionExerciseEntity`: + `supersetGroup`
 enum AureliaSchemaV4: VersionedSchema {
@@ -114,31 +114,45 @@ enum AureliaSchemaV4: VersionedSchema {
     }
 }
 
+/// Version 5 (current). Adds `ReminderEntity`; nothing existing changes.
+enum AureliaSchemaV5: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(5, 0, 0) }
+
+    static var models: [any PersistentModel.Type] {
+        [AppProfile.self, ExerciseEntity.self, TemplateEntity.self, WorkoutEntity.self,
+         SessionExerciseEntity.self, SetEntity.self, FoodEntity.self, FoodLogEntity.self,
+         SavedMealEntity.self, WaterEntity.self, SupplementEntity.self, SupplementCheckEntity.self,
+         WeightEntity.self, ActivityEntity.self, PhotoSetEntity.self, ReminderEntity.self]
+    }
+}
+
 /// The ordered history of schema versions. SwiftData walks this to bring an
 /// older store forward to the current one.
 ///
-/// **Adding V5:** freeze the V4 shapes of any model you change into
-/// `AureliaSchemaV4` (as the versions above do), define V5 with the new
-/// shapes, append it to `schemas`, and add a stage. Additive changes are `.lightweight`;
+/// **Adding V6:** freeze the V5 shapes of any model you change into
+/// `AureliaSchemaV5` (as the versions above do), define V6 with the new
+/// shapes, append it to `schemas`, and add a stage. Adding a whole new
+/// model, as V5 did, needs no freezing. Additive changes are `.lightweight`;
 /// renames, type changes, and required fields without defaults need `.custom`.
 enum AureliaMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self, AureliaSchemaV2.self, AureliaSchemaV3.self, AureliaSchemaV4.self] }
+    static var schemas: [any VersionedSchema.Type] { [AureliaSchemaV1.self, AureliaSchemaV2.self, AureliaSchemaV3.self, AureliaSchemaV4.self, AureliaSchemaV5.self] }
 
     static var stages: [MigrationStage] {
         [.lightweight(fromVersion: AureliaSchemaV1.self, toVersion: AureliaSchemaV2.self),
          .lightweight(fromVersion: AureliaSchemaV2.self, toVersion: AureliaSchemaV3.self),
-         .lightweight(fromVersion: AureliaSchemaV3.self, toVersion: AureliaSchemaV4.self)]
+         .lightweight(fromVersion: AureliaSchemaV3.self, toVersion: AureliaSchemaV4.self),
+         .lightweight(fromVersion: AureliaSchemaV4.self, toVersion: AureliaSchemaV5.self)]
     }
 }
 
 // MARK: - Containers
 
 enum Persistence {
-    static let schema = Schema(versionedSchema: AureliaSchemaV4.self)
+    static let schema = Schema(versionedSchema: AureliaSchemaV5.self)
 
     /// A human-readable version string, recorded in every export.
     static var schemaVersionString: String {
-        let v = AureliaSchemaV4.versionIdentifier
+        let v = AureliaSchemaV5.versionIdentifier
         return "\(v.major).\(v.minor).\(v.patch)"
     }
 

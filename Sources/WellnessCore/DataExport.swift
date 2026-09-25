@@ -29,6 +29,7 @@ public struct AureliaExport: Codable, Equatable, Sendable {
     /// Exercises the user created themselves. Optional so exports written
     /// before this field existed still decode.
     public var customExercises: [CustomExerciseRecord]?
+    public var reminders: [ReminderRecord]?
 
     public init(formatVersion: Int = AureliaExport.currentFormatVersion,
                 exportedAt: Date = .now,
@@ -44,7 +45,8 @@ public struct AureliaExport: Codable, Equatable, Sendable {
                 weights: [WeightRecord] = [],
                 activity: [ActivityRecord] = [],
                 photoSets: [PhotoSetRecord] = [],
-                customExercises: [CustomExerciseRecord]? = nil) {
+                customExercises: [CustomExerciseRecord]? = nil,
+                reminders: [ReminderRecord]? = nil) {
         self.formatVersion = formatVersion
         self.exportedAt = exportedAt
         self.schemaVersion = schemaVersion
@@ -60,13 +62,14 @@ public struct AureliaExport: Codable, Equatable, Sendable {
         self.activity = activity
         self.photoSets = photoSets
         self.customExercises = customExercises
+        self.reminders = reminders
     }
 
     /// Total rows in the export, for the confirmation the app shows the user.
     public var recordCount: Int {
         let counts: [Int] = [profile == nil ? 0 : 1, templates.count, workouts.count, foods.count, foodLogs.count,
                              water.count, supplements.count, supplementChecks.count, weights.count,
-                             activity.count, photoSets.count, customExercises?.count ?? 0]
+                             activity.count, photoSets.count, customExercises?.count ?? 0, reminders?.count ?? 0]
         return counts.reduce(0, +)
     }
 
@@ -197,5 +200,14 @@ public struct PhotoSetRecord: Codable, Equatable, Sendable {
     public var date: Date, front: String, side: String, back: String, isDemo: Bool
     public init(date: Date, front: String, side: String, back: String, isDemo: Bool) {
         self.date = date; self.front = front; self.side = side; self.back = back; self.isDemo = isDemo
+    }
+}
+
+public struct ReminderRecord: Codable, Equatable, Sendable {
+    public var title: String, kind: String, minutesOfDay: Int, endMinutesOfDay: Int, intervalMinutes: Int
+    public var weekdays: [Int], enabled: Bool
+    public init(title: String, kind: String, minutesOfDay: Int, endMinutesOfDay: Int, intervalMinutes: Int, weekdays: [Int], enabled: Bool) {
+        self.title = title; self.kind = kind; self.minutesOfDay = minutesOfDay; self.endMinutesOfDay = endMinutesOfDay
+        self.intervalMinutes = intervalMinutes; self.weekdays = weekdays; self.enabled = enabled
     }
 }

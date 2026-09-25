@@ -142,6 +142,8 @@ struct DayDetailView: View {
     @Query private var waters: [WaterEntity]
     @Query(sort: \WeightEntity.date, order: .reverse) private var weights: [WeightEntity]
     @Query private var activities: [ActivityEntity]
+    @Query(sort: \SupplementEntity.order) private var supplements: [SupplementEntity]
+    @Query private var checks: [SupplementCheckEntity]
     @State private var addFood = false
     @State private var addWorkout = false
     @State private var editWeight = false
@@ -194,11 +196,41 @@ struct DayDetailView: View {
                 }
                 Button("Add forgotten food") { addFood = true }
             }
+            Section("Supplements") {
+                if supplements.isEmpty {
+                    Text("Add supplements in Settings to track them.").foregroundStyle(.secondary)
+                }
+                ForEach(supplements) { supplement in
+                    let done = check(for: supplement.name) != nil
+                    Button { toggle(supplement.name) } label: {
+                        Label(supplement.name, systemImage: done ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(done ? Color.sage : Color.primary)
+                    }
+                }
+            }
+            Section {
+                LabeledContent("Water", value: units.formatWater(liters: water))
+                HStack {
+                    ForEach(units.waterQuickAdds, id: \.self) { amount in
+                        Button(units.waterQuickAddLabel(liters: amount)) {
+                            context.insert(WaterEntity(date: logDate, liters: amount))
+                            context.commit()
+                            Haptics.tap()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    if water > 0 {
+                        Spacer()
+                        Button { undoLastWater() } label: { Image(systemName: "arrow.uturn.backward") }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("Undo last water")
+                    }
+                }
+            } header: { Text("Water") }
             Section("Activity") {
                 LabeledContent("Steps", value: Int(activity?.steps ?? 0).formatted())
                 LabeledContent("Active calories", value: "\(Int(activity?.activeCalories ?? 0)) kcal")
                 if let hr = activity?.averageHeartRate { LabeledContent("Average heart rate", value: "\(Int(hr)) bpm") }
-                LabeledContent("Water", value: units.formatWater(liters: water))
             }
             Section("Weight") {
                 if let weight {
@@ -214,5 +246,22 @@ struct DayDetailView: View {
         .sheet(isPresented: $addWorkout) { AddWorkoutView(date: logDate) }
         .sheet(isPresented: $editWeight) { WeightEntryView(profile: profile, date: date) }
         .sheet(item: $editing) { entry in FoodEntryEditor(entry: entry) }
+    }
+
+    private func check(for name: String) -> SupplementCheckEntity? {
+        checks.first { calendar.isDate($0.date, inSameDayAs: date) && $0.supplementName == name }
+    }
+
+    private func toggle(_ name: String) {
+        if let existing = check(for: name) { context.delete(existing) }
+        else { context.insert(SupplementCheckEntity(date: logDate, name: name)) }
+        context.commit()
+        Haptics.tap()
+    }
+
+    private func undoLastWater() {
+        guard let last = waters.filter({ calendar.isDate($0.date, inSameDayAs: date) }).max(by: { $0.date < $1.date }) else { return }
+        context.delete(last)
+        context.commit()
     }
 }

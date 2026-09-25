@@ -254,6 +254,9 @@ struct SettingsView: View {
 
     private var remindersSection: some View {
         Section {
+            NavigationLink { RemindersView() } label: {
+                Label("Supplements, water, and custom reminders", systemImage: "bell.badge")
+            }
             Toggle("Workout days", isOn: $workoutReminderOn)
                 .onChange(of: workoutReminderOn) { _, on in
                     Task {
@@ -302,7 +305,7 @@ struct SettingsView: View {
                 }
             if let reminderNote { Text(reminderNote).font(.footnote).foregroundStyle(.secondary) }
         } header: { Text("Reminders") } footer: {
-            Text("Workout reminders fire on the weekdays your templates are scheduled. The evening check-in nudges you to log meals, water, and weight.")
+            Text("Custom reminders cover each supplement, a water schedule through the day, or anything else. Workout reminders fire on the weekdays your templates are scheduled. The evening check-in nudges you to log meals, water, and weight.")
         }
     }
 

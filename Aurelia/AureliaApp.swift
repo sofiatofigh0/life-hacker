@@ -108,7 +108,10 @@ struct RootView: View {
         }
         .tint(.sage)
         .overlay(alignment: .bottom) { ToastHost().padding(.bottom, 64) }
-        .task { await syncHealthIfAppropriate() }
+        .task {
+            if !demo.isEnabled { await ReminderScheduler.rescheduleAll(context: context) }
+            await syncHealthIfAppropriate()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await syncHealthIfAppropriate() } }
         }

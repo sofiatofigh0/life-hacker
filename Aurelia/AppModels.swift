@@ -129,6 +129,53 @@ import SwiftData
         self.basalCalories = basalCalories; self.averageHeartRate = averageHeartRate
     }
 }
+/// A scheduled nudge. `kind` is a `ReminderKind` raw value. A daily reminder
+/// fires at `minutesOfDay`; with `weekdays` set, only on those days (1 = Sun).
+/// A water reminder repeats every `intervalMinutes` from `minutesOfDay` until
+/// `endMinutesOfDay`. `notificationKey` is the stable prefix of its requests.
+@Model final class ReminderEntity {
+    var title: String
+    var kind: String
+    var minutesOfDay: Int
+    var endMinutesOfDay: Int
+    var intervalMinutes: Int
+    var weekdays: [Int]
+    var enabled: Bool
+    var notificationKey: String
+    var created: Date
+
+    init(title: String, kind: ReminderKind, minutesOfDay: Int, endMinutesOfDay: Int = 0, intervalMinutes: Int = 0,
+         weekdays: [Int] = [], enabled: Bool = true) {
+        self.title = title; self.kind = kind.rawValue; self.minutesOfDay = minutesOfDay; self.endMinutesOfDay = endMinutesOfDay
+        self.intervalMinutes = intervalMinutes; self.weekdays = weekdays; self.enabled = enabled
+        self.notificationKey = "reminder-" + UUID().uuidString; self.created = .now
+    }
+
+    var reminderKind: ReminderKind {
+        get { ReminderKind(rawValue: kind) ?? .other }
+        set { kind = newValue.rawValue }
+    }
+}
+
+enum ReminderKind: String, CaseIterable {
+    case supplement, water, other
+
+    var label: String {
+        switch self {
+        case .supplement: return "Supplement"
+        case .water: return "Water"
+        case .other: return "Other"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .supplement: return "pills"
+        case .water: return "drop"
+        case .other: return "bell"
+        }
+    }
+}
+
 @Model final class PhotoSetEntity { var date: Date; var front: String; var side: String; var back: String; var isDemo: Bool; init(date: Date = .now, front: String, side: String, back: String, isDemo: Bool = false) { self.date = date; self.front = front; self.side = side; self.back = back; self.isDemo = isDemo } }
 
 extension DailyScoreIndex {

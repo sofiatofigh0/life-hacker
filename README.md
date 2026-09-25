@@ -18,7 +18,7 @@ The app has been through a full-screen audit and a product-review pass (see
 [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) for the register and [`PRODUCT_REVIEW.md`](PRODUCT_REVIEW.md) for the
 walkthrough, the competitive comparison, and the fix list). Both rewrote most of the view layer; the code
 parses cleanly but the next ⌘R is its first real type check. Expect a round of diagnostics, as with every
-change so far. **This build migrates the data store to schema V4 on first launch** (V2 set logging, V3 per-exercise sets and reps, V4 supersets and Health workout import).
+change so far. **This build migrates the data store to schema V5 on first launch** (V2 set logging, V3 per-exercise sets and reps, V4 supersets and Health workout import, V5 reminders).
 
 ## What is implemented
 
@@ -39,7 +39,9 @@ change so far. **This build migrates the data store to schema V4 on first launch
   USDA proxy search, Open Food Facts barcode lookup, and camera scanner.
 - Historical calendar with a month summary, day editing, a week-vs-last-week card, manual weight and
   90-day trend chart with goal line, private three-angle photos with thumbnails, comparison, and deletion.
-- Reminders: workout days (derived from the scheduled templates), an evening log check-in, and weekly photos.
+- Reminders: per-supplement nudges, a water schedule through the day, custom reminders, workout days (from the
+  scheduled templates), an evening log check-in, and weekly photos. Any past day's supplements and water can be
+  edited from the calendar.
 - **Apple Health sync**: steps, active and resting energy, and average heart rate are imported for the
   last 14 days on launch, on return to the foreground, and on demand. Weights logged in the app are written
   to Health; weights recorded elsewhere (a scale) are imported for days with no manual entry. Workouts
@@ -69,7 +71,7 @@ Your logs live in one SwiftData database inside the app's container. They surviv
    delete the app to "reinstall cleanly"; that deletes the database and the photos.
 3. **Model changes go through the migration plan** in `Aurelia/Persistence.swift`. Schema V1 is frozen
    there; V2 (set completion, warm-up, RPE, exercise notes), V3 (per-exercise sets and reps in templates)
-   and V4 (supersets, Health workout import) migrate from it automatically. Content that
+   V4 (supersets, Health workout import) and V5 (reminders) migrate from it automatically. Content that
    only needs to grow — the exercise and food catalogs — is code, not schema, precisely so updates don't
    migrate anything. If a store ever fails to open, the orange banner offers **Start fresh**, which erases
    it only after you confirm; the app never deletes data on its own.

@@ -36,6 +36,7 @@
 		A1B2C3D0000000000000A111 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B111 /* PrivacyInfo.xcprivacy */; };
 		A1B2C3D0000000000000A112 /* ProgramCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B113 /* ProgramCatalog.swift */; };
 		A1B2C3D0000000000000A113 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B114 /* DesignSystem.swift */; };
+		A1B2C3D0000000000000A114 /* Reminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D0000000000000B115 /* Reminders.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +86,7 @@
 		A1B2C3D0000000000000B112 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
 		A1B2C3D0000000000000B113 /* ProgramCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramCatalog.swift; sourceTree = "<group>"; };
 		A1B2C3D0000000000000B114 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		A1B2C3D0000000000000B115 /* Reminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reminders.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -122,6 +124,7 @@
 				A1B2C3D000000000000000B0 /* AureliaApp.swift */,
 				A1B2C3D000000000000000B1 /* AppModels.swift */,
 				A1B2C3D0000000000000B114 /* DesignSystem.swift */,
+				A1B2C3D0000000000000B115 /* Reminders.swift */,
 				A1B2C3D000000000000000B5 /* Services.swift */,
 				A1B2C3D000000000000000BF /* Persistence.swift */,
 				A1B2C3D000000000000000C2 /* ExportService.swift */,
@@ -291,6 +294,7 @@
 				A1B2C3D000000000000000A0 /* AureliaApp.swift in Sources */,
 				A1B2C3D000000000000000A1 /* AppModels.swift in Sources */,
 				A1B2C3D0000000000000A113 /* DesignSystem.swift in Sources */,
+				A1B2C3D0000000000000A114 /* Reminders.swift in Sources */,
 				A1B2C3D000000000000000A5 /* Services.swift in Sources */,
 				A1B2C3D000000000000000A6 /* WellnessCore.swift in Sources */,
 				A1B2C3D000000000000000A9 /* Persistence.swift in Sources */,

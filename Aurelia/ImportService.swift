@@ -90,6 +90,11 @@ enum ImportService {
                                           basalCalories: a.basalCalories, averageHeartRate: a.averageHeartRate))
         }
         for p in export.photoSets { context.insert(PhotoSetEntity(date: p.date, front: p.front, side: p.side, back: p.back, isDemo: p.isDemo)) }
+        for r in export.reminders ?? [] {
+            let reminder = ReminderEntity(title: r.title, kind: ReminderKind(rawValue: r.kind) ?? .other, minutesOfDay: r.minutesOfDay,
+                                          endMinutesOfDay: r.endMinutesOfDay, intervalMinutes: r.intervalMinutes, weekdays: r.weekdays, enabled: r.enabled)
+            context.insert(reminder)
+        }
         for e in export.customExercises ?? [] {
             context.insert(ExerciseEntity(e.name, summary: e.summary, tips: e.tips, isCustom: true))
         }
@@ -110,6 +115,7 @@ enum ImportService {
         try context.delete(model: WeightEntity.self)
         try context.delete(model: ActivityEntity.self)
         try context.delete(model: PhotoSetEntity.self)
+        try context.delete(model: ReminderEntity.self)
         try context.delete(model: ExerciseEntity.self, where: #Predicate<ExerciseEntity> { $0.isCustom })
         try context.save()
     }

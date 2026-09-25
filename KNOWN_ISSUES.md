@@ -13,6 +13,13 @@ and includes the first real schema migration (V1 → V2).
 
 ---
 
+## Added after TestFlight
+
+| # | Item |
+|---|---|
+| T1 | **Reminders.** Schema V5 adds `ReminderEntity` (a new table only). Settings → Reminders → "Supplements, water, and custom reminders": one nudge per supplement (picked from your list), a water schedule (from / until / every N hours, shown as a count of firings), or anything else; every day or chosen weekdays; enable/disable per row. Notifications are rebuilt from the stored rows on every launch and carried by export/restore. |
+| T2 | **Past days.** Calendar → day detail now has Supplements (tick per supplement, stamped at noon that day) and Water (quick-adds and undo) alongside food, workouts and weight. |
+
 ## Added in the next-steps pass
 
 | # | Item |
